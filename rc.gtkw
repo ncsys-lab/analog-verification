@@ -1,0 +1,23 @@
+[*]
+[*] GTKWave Analyzer v3.3.115 (w)1999-2023 BSI
+[*] Thu Apr 27 22:08:46 2023
+[*]
+[dumpfile] "/home/akshay/Documents/analog-verification/firrtl-optimization/rc.vcd"
+[dumpfile_mtime] "Thu Apr 27 22:08:29 2023"
+[dumpfile_size] 19043
+[savefile] "/home/akshay/Documents/analog-verification/firrtl-optimization/rc.gtkw"
+[timestart] 0
+[size] 1920 1121
+[pos] -1 -1
+*-16.859230 179500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] rc_tb.
+[sst_width] 273
+[signals_width] 110
+[sst_expanded] 1
+[sst_vpaned_height] 338
+@23
+rc_tb.v_in[7:0]
+@22
+rc_tb.v_out[7:0]
+[pattern_trace] 1
+[pattern_trace] 0
