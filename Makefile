@@ -3,6 +3,9 @@
 
 DEPS=svreal.sv msdsl.sv
 
+%.model.sv: %.model.py
+	./$< > $@
+
 %.v: %.sv
 	sv2v $< > $@
 
@@ -27,4 +30,4 @@ tags:
 	ctags -R .
 
 clean:
-	rm -f *.vcd *.vvp *.f.v *.f.sv *.f *.v *.btor tags
+	rm -f *.vcd *.vvp *.f.v *.f.sv *.f *.v *.btor *.model.sv tags
