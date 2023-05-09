@@ -3,3 +3,7 @@
 *.vcd
 *.gtkw
 *.v
+*.f
+*.f.v
+*.f.sv
+*.vvp

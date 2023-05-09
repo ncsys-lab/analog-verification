@@ -1,9 +1,13 @@
+TARGETS=rc vco
 .PHONY: all clean tags
 .SUFFIXES:
 
 DEPS=svreal.sv msdsl.sv
 
 %.model.sv: %.model.py
+	# echo '`define CLK_MSDSL clk' > $@ && \
+	# echo '`define RST_MSDSL rst' >> $@ && \
+	# ./$< >> $@
 	./$< > $@
 
 %.v: %.sv
@@ -15,6 +19,9 @@ DEPS=svreal.sv msdsl.sv
 %.f.sv: %.f
 	firtool -O=release -format=fir -o $@ $<
 
+# %.f.sv: %.sv
+# 	cp $< $@
+
 %.vvp: %.tb.sv %.model.f.v
 	iverilog -g2005-sv $< -o $@
 
@@ -24,7 +31,7 @@ DEPS=svreal.sv msdsl.sv
 %.vcd: %.vvp
 	./$<
 
-all: rc.vcd rc.btor
+all: $(TARGETS:=.btor) $(TARGETS:=.vcd)
 
 tags:
 	ctags -R .
