@@ -1,4 +1,4 @@
-TARGETS=rc vco
+TARGETS=rc sine
 .PHONY: all clean tags
 .SUFFIXES:
 

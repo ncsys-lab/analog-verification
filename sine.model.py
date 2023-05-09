@@ -4,7 +4,7 @@ import numpy as np
 
 k = 1
 dt=1e-5
-m = MixedSignalModel('vco_model')
+m = MixedSignalModel('sine_model')
 v_in = m.add_analog_input('v_in')
 clk = m.add_digital_input('clk')
 rst = m.add_digital_input('rst')

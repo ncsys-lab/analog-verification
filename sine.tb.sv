@@ -1,8 +1,8 @@
 `timescale 1 ns/10 ps
 
-`include "vco.model.f.v"
+`include "sine.model.f.v"
 
-module vco_tb;
+module sine_tb;
 
   reg [7:0] v_in;
   reg [7:0] v_out;
@@ -12,7 +12,7 @@ module vco_tb;
   localparam period = 1;
   localparam delay = (2**8)*period;
 
-  vco_model osc(.v_in(v_in), .v_out(v_out), .clk(clk), .rst(rst));
+  sine_model osc(.v_in(v_in), .v_out(v_out), .clk(clk), .rst(rst));
 
   always begin
     clk = 1;
@@ -22,8 +22,8 @@ module vco_tb;
   end
 
   initial begin
-    $dumpfile("vco.vcd");
-    $dumpvars(0, vco_tb);
+    $dumpfile("sine.vcd");
+    $dumpvars(0, sine_tb);
     clk = 0;
     rst = 0;
     v_in = 0;
