@@ -9,7 +9,7 @@ v_in = m.add_analog_input('v_in')
 clk = m.add_digital_input('clk')
 rst = m.add_digital_input('rst')
 
-A = 3
+A = 2048
 
 v_out = m.add_analog_output('v_out')
 y = m.add_analog_state('y', range_=np.pi, init=0)
@@ -19,6 +19,6 @@ ddy = m.add_analog_state('ddy', range_=A**2 * np.pi, init=0)
 m.set_next_cycle(y, y + dy * dt, clk=clk, rst=rst)
 m.set_next_cycle(dy, dy + ddy * dt, clk=clk, rst=rst)
 m.set_next_cycle(ddy, -A**2 * y, clk=clk, rst=rst)
-m.set_next_cycle(v_out, 128*y+128, clk=clk, rst=rst)
+m.set_next_cycle(v_out, 256*(A*y+1.5), clk=clk, rst=rst)
 
 m.compile_and_print(VerilogGenerator())

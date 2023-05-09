@@ -10,7 +10,7 @@ module vco_tb;
   reg rst;
 
   localparam period = 1;
-  localparam delay = (2**17)*period;
+  localparam delay = (2**8)*period;
 
   vco_model osc(.v_in(v_in), .v_out(v_out), .clk(clk), .rst(rst));
 
