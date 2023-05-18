@@ -1,4 +1,4 @@
-TARGETS=rc sine
+TARGETS=rc sine vco
 .PHONY: all clean tags
 .SUFFIXES:
 
@@ -34,7 +34,7 @@ DEPS=svreal.sv msdsl.sv
 all: $(TARGETS:=.vcd)
 
 tags:
-	ctags -R .
+	ctags *.[sv,v,py,sh]
 
 clean:
 	rm -f *.vcd *.vvp *.f.v *.f.sv *.f *.v *.btor *.model.sv tags

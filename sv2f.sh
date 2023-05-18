@@ -22,10 +22,10 @@ hierarchy \
   -top $2 \
   -chparam v_in_range_val $range \
   -chparam v_in_width_val $width \
-  -chparam v_in_exponent_val $exponent \
-  -chparam v_out_range_val $range \
-  -chparam v_out_width_val $width \
-  -chparam v_out_exponent_val $exponent
+  -chparam v_in_exponent_val $exponent
+  # -chparam v_out_range_val $range \
+  # -chparam v_out_width_val $width \
+  # -chparam v_out_exponent_val $exponent
 proc
 flatten
 opt -nosdff
