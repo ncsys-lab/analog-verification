@@ -1,9 +1,1 @@
-*.model.sv
-*.btor
-*.vcd
-*.gtkw
-*.v
-*.f
-*.f.v
-*.f.sv
-*.vvp
+__pycache__
