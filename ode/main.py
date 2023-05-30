@@ -131,6 +131,7 @@ class Difference(Expression):
         return self.lhs.sympy - self.rhs.sympy
 
     def solve_intervals(self, intervals: "Dict[Real, IntervalSet]") -> "IntervalSet":
+        raise NotImplementedError
         return self.lhs.solve_intervals(intervals) - self.rhs.solve_intervals(intervals)
 
     @property
@@ -190,6 +191,7 @@ class Quotient(Expression):
         return self.lhs.sympy / self.rhs.sympy
 
     def solve_intervals(self, intervals: "Dict[Real, IntervalSet]") -> "IntervalSet":
+        raise NotImplementedError
         return self.lhs.solve_intervals(intervals) / self.rhs.solve_intervals(intervals)
 
     @property
