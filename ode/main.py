@@ -2,6 +2,7 @@ import sympy as sym
 from dataclasses import dataclass
 from typing import *
 import msdsl as M
+import itertools
 
 Real = lambda x: sym.Symbol(x, real=True)
 Positive = lambda x: sym.Symbol(x, real=True, positive=True)
@@ -15,13 +16,23 @@ v_ = v.diff(t)
 eq = sym.Eq(v_, -(w**2)*x)
 
 @dataclass
+class Range:
+    minimum: float
+    maximum: float
+    bits: int
+
+@dataclass
 class System:
     equations: List[sym.Eq]
     time: sym.Symbol
     inputs: List[sym.Symbol]
     outputs: List[sym.Symbol]
+    ranges: Dict[sym.Symbol, Range]
 
-sys = System([eq], t, [w], [x])
+sys = System([eq], t, [w], [x], {
+    x: Range(-1, 1, 8),
+    w: Range(0, 1, 8),
+})
 
 @dataclass
 class Integrator:
@@ -31,6 +42,21 @@ class Integrator:
     inputs: List[sym.Symbol]
     outputs: List[sym.Symbol]
     states: List[sym.Symbol]
+    ranges: Dict[sym.Symbol, Range]
+
+def propagate_ranges(ranges: Dict[sym.Symbol, Range], expr: sym.Expr) -> Range:
+    bounds = {x: (r.minimum, r.maximum) for x, r in ranges.items()}
+    widths = [r.bits for _, r in ranges.items()]
+    keys = bounds.keys()
+    values = bounds.values()
+    possibilities = []
+    for assignment in itertools.product(*values):
+        plan = dict(zip(keys, assignment))
+        e = expr
+        for v, a in plan.items():
+            e = e.subs(v, a)
+        possibilities += [e.doit()]
+    return Range(min(possibilities), max(possibilities), max(widths))
 
 def integrate(sys: System) -> Integrator:
     transformations = {}
@@ -38,6 +64,7 @@ def integrate(sys: System) -> Integrator:
     handled_derivatives = set()
     needed_derivatives = {(x, 0) for x in sys.outputs}
     dt = Real(f'__internal_d{sys.time.name}')
+    ranges = dict(sys.ranges)
 
     def get_name(target_name, n):
         num = str(n) if n != 1 else ''
@@ -71,6 +98,7 @@ def integrate(sys: System) -> Integrator:
         dsym = get_derivative(lhs.expr, derivative)
         handled_derivatives.add((lhs.expr, derivative))
         transformations[dsym] = rhs
+        ranges[dsym] = propagate_ranges(ranges, rhs)
 
     while len(needed_derivatives - handled_derivatives) != 0:
         f, n = next(iter(needed_derivatives - handled_derivatives))
@@ -79,6 +107,14 @@ def integrate(sys: System) -> Integrator:
         handled_derivatives.add((f, n))
         needed_derivatives.add((f, n + 1))
         transformations[s] = s + d*dt
+        print(s, ranges)
+        if s not in ranges:
+            prev = get_derivative(f, n - 1)
+            transformations[s] = propagate_ranges(ranges, prev.diff())
+            print(prev)
+            print(prev.diff())
+            print(s, transformations[s])
+            exit()
 
     states = set()
     for t in transformations:
@@ -86,7 +122,7 @@ def integrate(sys: System) -> Integrator:
     states -= set(sys.inputs)
     states -= set(sys.outputs)
     states -= set([sys.time, dt])
-    return Integrator(transformations, sys.time, dt, sys.inputs, sys.outputs, states)
+    return Integrator(transformations, sys.time, dt, sys.inputs, sys.outputs, states, ranges)
 
 def convert_to_msdsl(mapping, expr: sym.Expr):
     expr = expr.simplify()
