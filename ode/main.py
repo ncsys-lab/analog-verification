@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from abc import ABC
 from typing import List, Dict, Set, Optional
 import itertools
-from math import log, isinf, isnan
+from math import log, isinf, isnan, ceil
 import sympy as sym
 import copy
 import msdsl as M
@@ -72,7 +72,8 @@ class Real(Expression):
         return sym.Symbol(self.name, real=True)
 
     def solve_intervals(self, intervals: "Dict[Real, IntervalSet]") -> "IntervalSet":
-        return intervals.get(self, IntervalSet([Interval()]))
+        inf = float("inf")
+        return intervals.get(self, IntervalSet([Interval(-inf, inf, 0)]))
 
     @property
     def variables(self) -> "Set[Real]":
@@ -91,7 +92,7 @@ class Constant(Expression):
         return sym.RealNumber(self.value)
 
     def solve_intervals(self, intervals: "Dict[Real, IntervalSet]") -> "IntervalSet":
-        return IntervalSet([Interval(self.value, self.value)])
+        return IntervalSet([Interval(self.value, self.value, 0)])
 
     @property
     def variables(self) -> "Set[Real]":
@@ -250,21 +251,72 @@ class Derivative(Expression):
 
 @dataclass(frozen=True, order=True)
 class Interval:
-    lower: float = float("-inf")
-    upper: float = float("inf")
+    lower: float
+    upper: float
+    precision: float
+
+    @property
+    def signed(self) -> bool:
+        # we represent a number as signed if it can ever be negative (which is
+        # not necessarily the most efficient way)
+        return self.lower < -self.precision
+
+    @property
+    def range_size(self) -> float:
+        if self.signed:
+            return 2 * max(-self.lower, self.upper)
+        else:
+            return self.upper
+
+    @property
+    def bits(self) -> float:
+        if self.precision == 0:
+            return 0
+        values = self.range_size / self.precision
+        if not self.signed:
+            # adjust for two's complement
+            values += 1
+        if values == 0:
+            return float("inf")
+        return log(values, 2)
+
+    def precision_for_bits(self, bits) -> float:
+        if bits == 0:
+            return 0
+        if isinf(bits):
+            return 0
+        values = 2**bits
+        if not self.signed:
+            values -= 1
+        if values == 0:
+            return float("inf")
+        return self.range_size/values
 
     def __post_init__(self):
         assert self.lower <= self.upper or isnan(self.lower) or isnan(self.upper)
 
     def __add__(self, other: "Interval") -> "Interval":
-        return Interval(self.lower + other.lower, self.upper + other.upper)
+        # keep the coarser precision (same number of decimal places)
+        return Interval(
+            self.lower + other.lower,
+            self.upper + other.upper,
+            max(self.precision, other.precision),
+        )
 
     def __mul__(self, other: "Interval") -> "Interval":
+        # keep the smaller number of bits (same number of sig figs)
         x1, x2 = self.lower, self.upper
         y1, y2 = other.lower, other.upper
         pairs = itertools.product([x1, x2], [y1, y2])
         products = [x * y for x, y in pairs]
-        return Interval(min(products), max(products))
+
+        temp_interval = Interval(min(products), max(products), 0)
+        bits = min(self.bits, other.bits)
+        precision = temp_interval.precision_for_bits(bits)
+
+        i = Interval(min(products), max(products), precision)
+        assert(i.bits == bits)
+        return i
 
     def __and__(self, other: "Interval") -> "Optional[Interval]":
         x1, x2 = self.lower, self.upper
@@ -272,7 +324,7 @@ class Interval:
         if x1 > y1:
             return other & self
         if x2 >= y1:
-            return Interval(y1, min(x2, y2))
+            return Interval(y1, min(x2, y2), max(self.precision, other.precision))
         return None
 
     @property
@@ -334,7 +386,7 @@ class IntervalSet:
         return IntervalSet(sets)  # type: ignore
 
     def __neg__(self) -> "IntervalSet":
-        s = IntervalSet([Interval(-i.upper, -i.lower) for i in self.intervals])
+        s = IntervalSet([Interval(-i.upper, -i.lower, i.precision) for i in self.intervals])
         s.simplify()
         return s
 
@@ -362,6 +414,14 @@ class IntervalSet:
 
     def approx(self, other: "IntervalSet") -> bool:
         return all([x.approx(y) for x, y in zip(self.intervals, other.intervals)])
+
+    @property
+    def bits(self) -> float:
+        return max([x.bits for x in self.intervals])
+
+    @property
+    def signed(self) -> bool:
+        return any([x.signed for x in self.intervals])
 
 
 @dataclass(frozen=True)
@@ -406,7 +466,8 @@ class Integrator:
     def contract_intervals(self):
         old_intervals = None
         new_intervals = self.intervals
-        default = IntervalSet([Interval()])
+        inf = float("inf")
+        default = IntervalSet([Interval(-inf, inf, 0)])
 
         while old_intervals != new_intervals:
             if old_intervals is not None:
@@ -439,29 +500,48 @@ class Integrator:
 
         mapping = {}
 
-        default_width = 8
-        internal_width = 25
-        range_scaling = 1.5
-
         for i in inputs:
+            bits = ceil(self.intervals[i].bits)
+            signed = self.intervals[i].signed
+            drange = 2**(bits - 1) if signed else 2**bits
+            arange = self.intervals[i].bounds
+            scale = arange/drange
             din = model.add_digital_input(
-                f"{i.name}_in", width=default_width, signed=False
+                f"{i.name}_in", width=bits, signed=signed
             )
-            ain = model.add_analog_state(i.name, range_=self.intervals[i].bounds, width=internal_width)
+            ain = model.add_analog_state(
+                i.name, range_=arange, width=bits
+            )
             mapping[i] = ain
-            model.set_this_cycle(ain, M.to_real(din))
+            model.set_this_cycle(ain, scale*M.to_real(din))
         for o in outputs:
-            aout = model.add_analog_state(o.name, range_=self.intervals[o].bounds, width=internal_width)
-            dout = model.add_digital_output(
-                f"{o.name}_out", width=default_width, signed=True
+            bits = ceil(self.intervals[o].bits)
+            signed = self.intervals[o].signed
+            drange = 2**(bits - 1) if signed else 2**bits-1
+            arange = self.intervals[o].bounds
+            scale = drange/arange
+            aout = model.add_analog_state(
+                o.name, range_=self.intervals[o].bounds, width=bits
             )
-            model.set_this_cycle(dout, M.to_sint(aout, width=default_width))
+            dout = model.add_digital_output(
+                f"{o.name}_out", width=bits, signed=signed
+            )
+            if signed:
+                model.set_this_cycle(dout, M.to_sint(scale*aout, width=bits))
+            else:
+                sint = M.to_sint(scale*aout)
+                sint.format_.min_val = 0
+                sint.format_.max_val = drange
+                uint = M.to_uint(sint, width=bits)
+                model.set_this_cycle(dout, uint)
             mapping[o] = aout
         states = set(self.transitions.keys()) - set(inputs) - set(outputs)
         for s in states:
             mapping[s] = model.add_analog_state(
-                s.name, range_=self.intervals[s].bounds, init=init.get(s, 0),
-                width = internal_width,
+                s.name,
+                range_=self.intervals[s].bounds,
+                init=init.get(s, 0),
+                width=ceil(self.intervals[s].bits),
             )
 
         for t, expr in self.transitions.items():
@@ -481,9 +561,9 @@ integrator = eq.integrate(
     outputs=[x],
     frequency=1e3,
     intervals={
-        w: IntervalSet([Interval(0, 1)]),
-        x: IntervalSet([Interval(0, 1)]),
-        x.diff().real: IntervalSet([Interval(0, 1)]),
+        w: IntervalSet([Interval(0, 1, 1/255)]),
+        x: IntervalSet([Interval(-1, 1, 1/127)]),
+        x.diff().real: IntervalSet([Interval(0, 1, 1/255)]),
     },
 )
 integrator.to_msdsl(
