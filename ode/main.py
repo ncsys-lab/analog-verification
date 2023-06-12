@@ -237,7 +237,7 @@ class Derivative(Expression):
     def name(self) -> str:
         assert isinstance(self.target, Real)
         x = "" if self.depth == 1 else str(self.depth)
-        return f"_d{x}{self.target.name}_dt{x}"
+        return f"d{x}{self.target.name}_dt{x}"
 
     @property
     def real(self) -> Real:
@@ -331,7 +331,7 @@ class IntervalSet:
             for a, b in itertools.product(self.intervals, other.intervals)
             if a & b != None
         ]
-        return IntervalSet(sets) # type: ignore
+        return IntervalSet(sets)  # type: ignore
 
     def __neg__(self) -> "IntervalSet":
         s = IntervalSet([Interval(-i.upper, -i.lower) for i in self.intervals])
@@ -397,6 +397,7 @@ class Equality:
         integrator.contract_intervals()
         return integrator
 
+
 @dataclass
 class Integrator:
     transitions: Dict[Real, Expression]
@@ -427,44 +428,69 @@ class Integrator:
 
         self.intervals = new_intervals
 
-    def to_msdsl(self, name, inputs, outputs):
+    def to_msdsl(self, name, inputs, outputs, init={}):
         for symbol in self.intervals:
             if self.intervals[symbol].isinf:
                 raise ValueError(f"found infinite range for {symbol}")
 
         model = M.MixedSignalModel(name)
-        clk = model.add_digital_input('_clk')
-        rst = model.add_digital_input('_rst')
+        clk = model.add_digital_input("clk")
+        rst = model.add_digital_input("rst")
 
         mapping = {}
 
+        default_width = 8
+        internal_width = 25
+        range_scaling = 1.5
+
         for i in inputs:
-            mapping[i] = model.add_analog_input(i.name)
+            din = model.add_digital_input(
+                f"{i.name}_in", width=default_width, signed=False
+            )
+            ain = model.add_analog_state(i.name, range_=self.intervals[i].bounds, width=internal_width)
+            mapping[i] = ain
+            model.set_this_cycle(ain, M.to_real(din))
         for o in outputs:
-            mapping[o] = model.add_analog_output(o.name)
+            aout = model.add_analog_state(o.name, range_=self.intervals[o].bounds, width=internal_width)
+            dout = model.add_digital_output(
+                f"{o.name}_out", width=default_width, signed=True
+            )
+            model.set_this_cycle(dout, M.to_sint(aout, width=default_width))
+            mapping[o] = aout
         states = set(self.transitions.keys()) - set(inputs) - set(outputs)
         for s in states:
-            mapping[s] = model.add_analog_state(s.name, range_=self.intervals[s].bounds)
+            mapping[s] = model.add_analog_state(
+                s.name, range_=self.intervals[s].bounds, init=init.get(s, 0),
+                width = internal_width,
+            )
 
         for t, expr in self.transitions.items():
-            model.set_next_cycle(t.msdsl(mapping), expr.msdsl(mapping), clk=clk, rst=rst)
+            model.set_next_cycle(
+                t.msdsl(mapping), expr.msdsl(mapping), clk=clk, rst=rst
+            )
         model.compile_and_print(M.VerilogGenerator())
-
 
 
 w = Real("w")
 x = Real("x")
 v = x.diff()
 v_ = v.diff()
-eq = Equality(v_, -(w*w) * x)
+eq = Equality(v_, -(w * w) * x)
 integrator = eq.integrate(
-    [w],
-    [x],
-    1e6,
-    {
+    inputs=[w],
+    outputs=[x],
+    frequency=1e3,
+    intervals={
         w: IntervalSet([Interval(0, 1)]),
         x: IntervalSet([Interval(0, 1)]),
         x.diff().real: IntervalSet([Interval(0, 1)]),
     },
 )
-integrator.to_msdsl("vco", [w], [x])
+integrator.to_msdsl(
+    "vco",
+    inputs=[w],
+    outputs=[x],
+    init={
+        x.diff().real: 1,
+    },
+)
