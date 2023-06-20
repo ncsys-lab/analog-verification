@@ -6,8 +6,8 @@ RUN python3.9 -m ensurepip
 
 WORKDIR /bin
 RUN curl https://zyedidia.github.io/eget.sh | sh
-RUN eget llvm/circt
-RUN eget zachjs/sv2v
+RUN eget llvm/circt -t firtool-1.44.0
+RUN eget zachjs/sv2v -t v0.0.10
 
 WORKDIR /home
 
