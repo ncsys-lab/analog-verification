@@ -38,6 +38,11 @@ This uses the versions of msdsl and svreal from
 [msdsl-examples](msdsl-examples), which are modified to be synthesizable in
 Yosys.
 
+Sometimes `firtool` will reject a circuit produced by MSDSL.  In this case the
+FIRRTL step can be skipped by adding `-e USE_FIRRTL=false`, at the cost of a
+less optimized circuit.  The circuit is still optimized to some extent by
+`yosys`.
+
 ## Old Pipeline: `pipeline`
 
 This performs similar steps to the Docker pipeline, but uses a Makefile for
