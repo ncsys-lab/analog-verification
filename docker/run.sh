@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+if [[ "$MODEL_NAME" == "" ]]
+then
+  echo 'Error: $MODEL_NAME not specified.' > /dev/stderr
+  exit 1
+fi
+
 set -e
 # Read the model (as Python) from STDIN
 cat > model.py
@@ -9,9 +15,8 @@ if $USE_FIRRTL
 then
   # Convert to Verilog and extract top-level name
   sv2v model.sv > model.v
-  model_name=$(grep "MixedSignalModel" model.py | sed -E "s/.*'(.*)'.*/\1/")
   # Convert to FIRRTL
-  ./sv2f.sh model.v $model_name > model.f
+  ./sv2f.sh model.v $MODEL_NAME > model.f
   # Convert back to SystemVerilog
   firtool -O=release -format=fir -o model.f.sv model.f
 else
