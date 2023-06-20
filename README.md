@@ -34,6 +34,10 @@ It expects the name of the top-level module to be specified in the
 
     docker run -e MODEL_NAME=vco -i msdsl-optimizer < input.py > output.v
 
+This uses the versions of msdsl and svreal from
+[msdsl-examples](msdsl-examples), which are modified to be synthesizable in
+Yosys.
+
 ## Old Pipeline: `pipeline`
 
 This performs similar steps to the Docker pipeline, but uses a Makefile for
@@ -54,3 +58,4 @@ It uses `/data` as the working directory within the container.
 [msdsl]: https://github.com/sgherbst/msdsl/tree/master
 [svreal]: https://github.com/sgherbst/svreal
 [circt]: https://github.com/llvm/circt
+[msdsl-examples]: https://github.com/CyanoKobalamyne/msdsl-examples
