@@ -14,8 +14,8 @@ WORKDIR /home
 COPY requirements.txt .
 RUN python3.9 -m pip install -r requirements.txt
 
-COPY *.sv .
-COPY *.sh .
+COPY *.sv ./
+COPY *.sh ./
 
 ENV USE_FIRRTL true
 
