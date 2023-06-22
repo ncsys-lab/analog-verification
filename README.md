@@ -55,6 +55,8 @@ This contains an incomplete Dockerfile to run [`fixture`](fixture), which can
 extract a behavioral model from a component-level description of an analog
 circuit.  It can be run on the provided examples thus:
 
+    cd fixture-setup
+    docker build . -t fixture
     docker run -it -v.:/data fixture ctle.yaml
 
 It uses `/data` as the working directory within the container.
