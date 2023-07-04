@@ -72,4 +72,4 @@ It uses `/data` as the working directory within the container.
 
 Contained in folder gds2spice, there is a makefile which extracts a spice netlist from a user-provided gds file. At the current moment, running this tool requires Magic and the skywater PDK to be installed on your computer. You may use install_sky130_and_magic.sh to install magic and the sky130 PDK, but it takes about 30 minutes to install and requires about 25Gb
 
-To use this flow, you must run `make <GDS NAME>.spice` in the folder gds2spice. The folder must contain your gds file. Additionally, you must set your environment variable in the given Makefile. You can either do this by executing the command `export PDK_ROOT=<path-to-sky130A/libs.tech/magic/sky130A.tech>` or by changing the line in the Makefile
+To use this flow, you must run `make <GDS NAME>.spice` in the folder gds2spice. The folder must contain your gds file. Additionally, you must set your environment variable in the given Makefile. You can either do this by executing the command `export PDK_ROOT=<path-to-sky130A/libs.tech/magic/sky130A.tech>` before running `make` or by changing the line in the Makefile
