@@ -45,48 +45,57 @@ def type_relax(t1,t2):
 
     sign = t1.signed or t2.signed
 
-    if t1.scale == t2.scale:
-        int_bits = max(t1.int_bits,t2.int_bits)
-        return FixedPointType(int_bits=int_bits, signed=sign, scale_bits=t1.scale_bits)
-    elif t1.int_bits < t2.int_bits:
-        new_int_bits = abs(t2.scale - t1.scale) + t1.int_bits
-        t1new = FixedPointType(int_bits=new_int_bits, scale_bits=t2.scale_bits, signed=t1.signed)
-        return type_relax(t1new,t2)
+    if t1.log_scale == t2.log_scale:
+        integer = max(t1.integer,t2.integer)
+        return FixedPointType.from_integer_scale(integer=integer, signed=sign, log_scale=t1.log_scale)
+
+    elif t1.log_scale > 0 and t2.log_scale  > 0:
+        print(t1,t2)
+        raise NotImplementedError
+
+    elif t1.log_scale < 0 and t2.log_scale  < 0:
+        integer = max(t1.integer,t2.integer)
+        log_scale = min(t1.log_scale,t2.log_scale)
+        return FixedPointType.from_integer_scale(integer=integer, signed=sign, log_scale=log_scale)
+
     else:
-        new_int_bits = abs(t1.scale - t2.scale) + t2.int_bits
-        t2new = FixedPointType(int_bits=new_int_bits, scale_bits=t1.scale_bits, signed=t2.signed)
-        return type_relax(t1new,t2)
+        raise NotImplementedError
 
 # make 
 def type_match(e,t):
-    if e.fp_type().match(t):
+    print(e)
+    if e.type.match(t):
         return e
 
-    if e.fp_type().signed and not t.signed:
-        return type_match(FPToUnsigned(expr=e),t)
-
-    if not e.fp_type().signed and t.signed:
+    if not e.type.signed and t.signed:
         return type_match(FPToSigned(expr=e),t)
 
-    if e.fp_type().int_bits < t.int_bits:
-        # pad from right, 
-        npad = t.int_bits - e.fp_type().int_bits
-        newe = FPPadRight(expr=e, nbits=npad)
-        return type_match(newe,t)
+    if e.type.fractional < t.fractional:
+        return type_match(FPExtendFrac(expr=e,nbits=t.fractional - e.type.fractional), t)
 
-    if e.fp_type().int_bits > t.int_bits:
-        # shift left k, scaling up by 2^k. truncate from right
-        ntrunc = e.fp_type().int_bits-t.int_bits
-        newe = FPTruncRight(expr=e, nbits=ntrunc)
-        return type_match(newe,t)
-
-    if e.fp_type().scale_bits != t.scale_bits:
-        scale_adjust = t.scale_bits-e.fp_type().scale_bits
-        newe = FPScale(e,nbits=scale_adjust)
-        return type_match(newe, t)
+    if e.type.fractional > t.fractional:
+        nbits_trunc = e.type.fractional-t.fractional
+        if e.type.fractional - nbits_trunc >= 0:
+            return type_match(FPTruncFrac(expr=e, nbits=nbits_trunc), t)
+        else:
+            rem_trunc = nbits_trunc - e.type.fractional
+            return type_match(FPTruncInt(FPTruncFrac(expr=e, nbits=e.type.fractional), nbits=rem_trunc), t)
 
 
-    raise Exception("unhandled type nudge: expr=%s targ_type=%s" % (e,t))
+
+    if e.type.integer != t.integer:
+        print(e.type, t)
+        raise NotImplementedError
+
+    if e.type.scale != t.scale:
+        print(e.type, t)
+        raise NotImplementedError
+
+    if e.type.fractional > t.fractional:
+        print(e.type, t)
+        raise NotImplementedError
+
+    raise NotImplementedError
 
     
 def fixed_point_expr(reg,expr):
@@ -94,49 +103,48 @@ def fixed_point_expr(reg,expr):
         new_e = fixed_point_expr(reg,e)
         return new_e
 
+
     if isinstance(expr, exprlib.Product):
         lhse =  rec(expr.lhs)
         rhse = rec(expr.rhs)
         expr_type = reg.get_type(expr.ident)
-        targ_type = type_relax(lhse.fp_type(), rhse.fp_type())
+        targ_type = type_relax(lhse.type, rhse.type)
 
         lhse_tm = type_match(lhse,targ_type)
         rhse_tm = type_match(rhse,targ_type)
-        prod = FPBox(expr=exprlib.Product(lhse_tm, rhse_tm), type=targ_type)
+        prod = exprlib.Product(lhse_tm, rhse_tm)
+        prod.type = targ_type
         prod_typematch = type_match(prod, expr_type)
         return prod_typematch
 
     elif isinstance(expr, exprlib.Constant):
-        tol = 1e-3
-        scale = math.ceil(math.log2(expr.value))
-        scaled_val = abs(expr.value/(2**scale))
-        signed = expr.value <= 0
-        nint_bits = 1
-        while scaled_val > tol:
-            scaled_val -= 2**(-nint_bits)
-            nint_bits += 1
-
-        constfp = FPBox(expr=expr, type=FixedPointType(int_bits=nint_bits,signed=signed,scale_bits=scale))
-        return constfp 
+        expr.type = reg.get_type(expr.ident)
+        return expr 
 
     elif isinstance(expr, exprlib.Negation):
         new_expr = rec(expr.expr)
-        return FPToSigned(new_expr) if new_expr.fp_type().signed else new_expr 
-        
+        if not new_expr.type.signed:
+            neg_expr = exprlib.Negation(FPToSigned(new_expr)) 
+            neg_expr.expr.type = reg.get_type(expr.ident)
+        else:
+            neg_expr = exprlib.Negation(new_expr)
+        neg_expr.type = reg.get_type(expr.ident)
+        return neg_expr
 
     elif isinstance(expr, exprlib.Var):
-        return FPBox(expr=expr,type=reg.get_type(expr.name))
+        expr.type = reg.get_type(expr.name)
+        return expr
 
     elif isinstance(expr, exprlib.VarAssign):
         lhse =  rec(expr.lhs)
         rhse = rec(expr.rhs)
-        rhse_tm = type_match(rhse,lhse.fp_type())
+        rhse_tm = type_match(rhse,lhse.type)
         return exprlib.VarAssign(lhse, rhse_tm)
 
     elif isinstance(expr, exprlib.Integrate):
         lhse =  rec(expr.lhs)
         rhse = rec(expr.rhs)
-        rhse_tm = type_match(rhse,lhse.fp_type())
+        rhse_tm = type_match(rhse,lhse.type)
         return exprlib.Accumulate(lhse, rhse_tm)
 
     else:
@@ -168,8 +176,7 @@ def fixed_point_block(reg,block):
             raise NotImplementedError
     return fp_block
 
-def to_fixed_point(block, rel_prec=0.001):
-    ival_reg = intervallib.compute_intervals_for_block(block,rel_prec=rel_prec)
+def to_fixed_point(ival_reg, block):
     fp_reg = fixed_point_reprs(ival_reg)
     fp_blk = fixed_point_block(fp_reg, block)
     return fp_blk

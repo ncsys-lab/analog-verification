@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
 from dataclasses import dataclass, field
-from core.expr import VarType, Var, VarAssign, Integrate 
+from core.expr import VarType, Var, VarAssign, Integrate, Accumulate 
 
 
 class VarKind(Enum):
@@ -19,7 +19,8 @@ class VarInfo:
     variable: Var = None
 
     def __post_init__(self):
-        self.variable = Var(self.name, self.type)
+        self.variable = Var(self.name)
+        self.variable.type = self.type
 
     @property 
     def stateful(self):
@@ -76,20 +77,23 @@ class AMSBlock:
             q(str(v))
         q("")
         for r in self.relations():
-            q(str(r))
+            q(r.pretty_print())
         return "\n".join(stmts)
 
 
 def execute_block(blk, args):
     vals = dict(args)
     for rel in blk.relations():
-        print(vals)
         if isinstance(rel, VarAssign):
             rhs_val = rel.rhs.execute(vals)
-            vals[rel.lhs.name] = rhs_val
+            vals[rel.lhs.name] = rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Integrate):
             rhs_val = rel.rhs.execute(vals)
-            vals[rel.lhs.name] += rhs_val
+            vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
+        elif isinstance(rel,Accumulate):
+            rhs_val = rel.rhs.execute(vals)
+            vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
+
         else:
             raise Exception("not supported: %s" % rel)
     return vals

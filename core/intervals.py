@@ -33,6 +33,7 @@ class IntervalPrecRegistery:
         self.info[ident] = IntervalPrecRegistery.IntervalPrecInfo(lower=lower, upper=upper,precision=precision)
         self.info[ident].initialize()
         self.info[ident].check()
+        return self.info[ident]
 
     def decl_sym_info(self,ident,interval_expr, precision_expr, relative_precision=0.0001):
         upper = interval_expr.nominal_value + interval_expr.std_dev
@@ -75,7 +76,8 @@ def propagate_expr(reg, e,rel_prec):
     if isinstance(e, exprlib.Constant):
         lb = e.value - (e.value*rel_prec)
         ub = e.value + (e.value*rel_prec)
-        reg.decl_info(e.ident, lb, ub, e.value*rel_prec)
+        info = reg.decl_info(e.ident, lb, ub, e.value*rel_prec)
+        e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
 
     else:
         expr = e.sympy
@@ -85,8 +87,8 @@ def propagate_expr(reg, e,rel_prec):
         lambd = sympy.lambdify(vs,expr)
         ival_expr = lambd(*ival_args)
         prec_expr = lambd(*prec_args)
-        reg.decl_sym_info(e.ident, interval_expr=ival_expr, precision_expr=prec_expr, relative_precision=rel_prec)
-
+        info=reg.decl_sym_info(e.ident, interval_expr=ival_expr, precision_expr=prec_expr, relative_precision=rel_prec)
+        e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
 
 def real_type_from_expr(blk,expr,rel_prec=0.01):
     reg = build_interval_symtbl(blk)

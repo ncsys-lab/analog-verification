@@ -3,120 +3,205 @@ from core.expr import Expression,VarType
 from typing import ClassVar
 from dataclasses import dataclass, field
 import math
+from fixedpoint import FixedPoint, FixedPointOverflowError
 
 
 @dataclass(frozen=True)
 class FixedPointType(VarType):
-    int_bits : int
-    scale_bits : int
+    fractional : int
+    integer : int
+    log_scale: int 
     signed:  bool
     type_name : ClassVar[str] = "fixed_point"
 
+    def __post_init__(self):
+        assert(self.integer >= 0)
+        assert(self.fractional >= 0)
+
+    @classmethod
+    def from_integer_scale(cls,integer,log_scale,signed):
+        if log_scale < 0:
+            fractional = abs(log_scale)
+        else:
+            fractional = 0
+        return FixedPointType(fractional=fractional,integer=integer, signed=signed, log_scale=log_scale)
+        
     @classmethod
     def from_interval_precision(self,lower,upper,precision):
         is_signed = lower < 0.0
-        nvals = (upper - lower)/precision
-        int_bits = math.ceil(math.log2(nvals))
+        nvals = (max(abs(upper), abs(lower))+precision)/precision
+        total_bits = math.ceil(math.log2(nvals))
         scale_bits = math.floor(math.log2(precision))
-        return FixedPointType(int_bits=int_bits,scale_bits=scale_bits, signed=is_signed)
+        if scale_bits < 0:
+            fractional = abs(scale_bits)
+            integer = max(total_bits - fractional,0)
+        else:
+            fractional = 0
+            integer = total_bits-scale_bits
 
+        return FixedPointType(fractional=fractional,integer=integer,signed=is_signed, log_scale=scale_bits)
+
+    # number fractional bits
     @property
     def scale(self):
-        return 2**(self.scale_bits)
+        return 2**(self.log_scale)
+
+
+    # number fractional bits
+    @property
+    def n(self):
+        return self.n_fractional_bits
+
+    # number integer bits 
+    @property
+    def m(self):
+        return self.n_integer_bits
 
     @property
-    def nbits(self):
-        return self.int_bits + (1 if self.signed else 0)
+    def n_integer_bits(self):
+        return self.integer + (1 if self.signed else 0)
+
+    @property
+    def n_fractional_bits(self):
+        return self.fractional
+
 
     def match(self,fpe):
-        return fpe.int_bits == self.int_bits and \
-            fpe.scale_bits == self.scale_bits and \
+        return fpe.integer == self.integer and \
+            fpe.fractional == self.fractional and \
             fpe.signed == self.signed
 
-@dataclass
-class FPExpression(Expression):
+    def typecast_value(self,value):
+        assert(not value is None)
+        assert(value.n >= self.n and value.m >= self.m)
+        return self.from_real(float(value))
 
-    def fp_type(self):
-        raise NotImplementedError
+    def typecheck_value(self,value):
+        msg = "value=%f type=%s m=%d n=%d repr=(m=%s,n=%s,sgn=%s)" % (value, self, self.m, self.n, value.m, value.n, value.signed)
+        if not self.signed and value.signed:
+            raise Exception("mismatch on sign type=%s value=%s\n  %s" % (self.signed, value.signed,msg))
+
+        if self.m != value.m:
+            raise Exception("integer size mismatch type=%d value=%d\n   %s" % (self.m,value.m,msg))
+
+        if self.n != value.n:
+            raise Exception("fractional size mismatch type=%d value=%d   %s" % (self.n,value.n,msg))
+
+
+    def to_real(self,value):
+        if isinstance(value,FixedPoint):
+            return float(value)
+        else:
+            return value
+
+
+    def from_real(self,value):
+        if isinstance(value,FixedPoint):
+            nvalue = float(value)
+        else:
+            nvalue = int(round(float(value)/self.scale))*self.scale
+
+        fpn = FixedPoint(nvalue, m=self.m, n=self.n, signed=self.signed,  
+            overflow="clamp", overflow_alert='ignore')
+        self.typecheck_value(fpn)
+        if abs(float(fpn) - value) > self.scale:
+            print("[WARN] precision requirement violated: orig-value=%f, fp-value=%f, scale=%f" % (value,float(fpn),self.scale))
+
+        return fpn
+
 
 @dataclass
-class FPOp(FPExpression):
-    expr : FPExpression
+class FPOp(Expression):
+    expr : Expression
 
     def children(self):
         return [self.expr]
 
 
-
 @dataclass
-class FPBox(FPOp):
-    type : FixedPointType
-
-    def fp_type(self):
-        return self.type
-
-    def execute(self,args):
-        value = self.expr.execute(args)
-        typ = self.fp_type()
-        fixpt_value = typ.from_value(value)
-
-@dataclass
-class FPScale(FPOp):
+class FPTruncFrac(FPOp):
     nbits : int
 
-    def scale(self):
-        return 2**self.nbits
-
-    def fp_type(self):
-        fpt = self.expr.fp_type()
-        return FixedPointType(int_bits=fpt.int_bits, scale_bits=fpt.scale_bits+self.nbits, signed=fpt.signed)
+    @property
+    def type(self):
+        fpt = self.expr.type
+        assert(fpt.fractional - self.nbits >= 0)
+        return FixedPointType(integer=fpt.integer, fractional=fpt.fractional - self.nbits, \
+                            log_scale=fpt.log_scale + self.nbits, \
+                            signed=fpt.signed)
  
-@dataclass
-class FPPadRight(FPOp):
-    nbits : int
-
-    def scale(self):
-        return 2**(nbits)
-
-
-    def fp_type(self):
-        fpt = self.expr.fp_type()
-        return FixedPointType(int_bits=fpt.int_bits+self.nbits, scale_bits=fpt.scale_bits+self.nbits, signed=fpt.signed)
- 
-@dataclass
-class FPTruncRight(FPOp):
-    nbits : int
-
-    def scale(self):
-        return 2**(-nbits)
-
-
-    def fp_type(self):
-        fpt = self.expr.fp_type()
-        return FixedPointType(int_bits=fpt.int_bits-self.nbits, scale_bits=fpt.scale_bits-self.nbits, signed=fpt.signed)
-
     def execute(self,args):
-        value = self.expr.execute(args)
-        print(value)
-        raise NotImplementedError
+        value = FixedPoint(self.expr.execute(args))
+        new_bitvec= bin(value.bits >> self.nbits)
+        new_value = FixedPoint(new_bitvec, n=self.type.n, m=self.type.m, signed=self.type.signed)
+        self.type.typecheck_value(new_value)
+        if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > self.type.scale:
+            raise Exception("Fractional truncate produced incorrect value: original=%f, truncated=%f" % (float(value), float(new_value)))
+
+
+        return new_value
+
+    def pretty_print(self):
+        return "truncF(%s,%d)" % (self.expr.pretty_print(), self.nbits)
+
+
+
+
+@dataclass
+class FPExtendFrac(FPOp):
+    nbits : int
+
+    @property
+    def type(self):
+        fpt = self.expr.type
+        return FixedPointType(integer=fpt.integer, fractional=fpt.fractional + self.nbits, \
+                            log_scale=fpt.log_scale - self.nbits, \
+                            signed=fpt.signed)
+
+ 
+    def execute(self,args):
+        value = FixedPoint(self.expr.execute(args))
+        new_bitvec=bin(value.bits << self.nbits)
+        new_value = FixedPoint(new_bitvec, n=self.type.n, m=self.type.m, signed=self.type.signed)
+        self.type.typecheck_value(new_value)
+        if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
+            raise Exception("Fractional extend produced incorrect value")
+
+        return new_value
+
+    def pretty_print(self):
+        return "xtendF(%s,%d)" % (self.expr.pretty_print(), self.nbits)
+
+@dataclass
+class FPExtendInt(FPOp):
+    nbits : int
+
+
 
 @dataclass
 class FPToSigned(FPOp):
     expr : Expression
 
-    def fp_type(self):
-        fpt = self.expr.fp_type()
-        return FixedPointType(int_bits=fpt.int_bits, scale_bits=fpt.scale_bits, signed=True)
+    @property
+    def type(self):
+        fpt = self.expr.type
+        if not fpt.signed:
+            return FixedPointType.from_integer_scale(integer=fpt.integer,log_scale=fpt.log_scale,signed=True)
+        else:
+            return fpt
+ 
+    def execute(self,args):
+        value = self.expr.execute(args)
+        new_value = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=self.type.signed)
+        self.type.typecheck_value(new_value)
+        if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
+            raise Exception("Sign extend produced incorrect value")
 
 
-
-@dataclass
-class FPToUnsigned(FPOp):
-    expr : Expression
+        return new_value
 
 
-    def fp_type(self):
-        fpt = self.expr.fp_type()
-        return FixedPointType(int_bits=fpt.int_bits, scale_bits=fpt.scale_bits, signed=False)
+    def pretty_print(self):
+        return "toSigned(%s)" % (self.expr.pretty_print())
 
 

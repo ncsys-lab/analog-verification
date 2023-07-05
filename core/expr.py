@@ -5,7 +5,7 @@ import itertools
 from math import log, isinf, isnan, ceil
 import sympy as sym
 import copy
-import msdsl as M
+#import msdsl as M
 from itertools import count
 
 @dataclass(frozen=True)
@@ -15,9 +15,18 @@ class VarType:
     def isType(self,other):
         return self.type_name == other.type_name
 
+    def typecast_value(self,v):
+        raise Exception("typecast_value: override me <%s>" % self)
 
-    def from_value(self,v):
-        raise Exception("from_value: override me <%s>" % self)
+    def typecheck_value(self,v):
+        raise Exception("typecheck_value: override me <%s>" % self)
+
+    def from_real(self,v):
+        raise Exception("from_real: override me <%s>" % self)
+
+    def to_real(self,v):
+        raise Exception("to_real: override me <%s>" % self)
+
 
 @dataclass(frozen=True)
 class RealType(VarType):
@@ -30,7 +39,18 @@ class RealType(VarType):
     def interval(self):
         return [self.lower,self.upper]
 
-    def from_value(self,v):
+    def typecast_value(self,v):
+        return min(max(self.lower,v),self.upper)
+
+
+    def typecheck_value(self,v):
+        return isinstance(v,float)
+
+    def to_real(self,v):
+        return v
+
+
+    def from_real(self,v):
         return min(max(self.lower,v),self.upper)
 
 @dataclass(frozen=True)
@@ -40,6 +60,7 @@ class TimeType(VarType):
 
 @dataclass
 class Expression:
+    type : Optional[VarType] = field(default=False,init=False) 
     ident : int = field(default_factory=count().__next__,init=False)
 
     def children(self):
@@ -109,7 +130,6 @@ class Expression:
 @dataclass
 class Var(Expression):
     name: str
-    type: VarType
     op_name : ClassVar[str]= "var"
 
     @property
@@ -126,7 +146,12 @@ class Var(Expression):
 
     def execute(self,args):
         value = args[self.name]
-        return self.type.from_value(value)
+        newv = self.type.from_real(value)
+        self.type.typecheck_value(newv)
+        return newv 
+
+    def pretty_print(self):
+        return self.name
 
 @dataclass
 class Constant(Expression):
@@ -142,12 +167,21 @@ class Constant(Expression):
         return set()
 
     def execute(self,args):
+        newv = self.type.from_real(self.value)
+        self.type.typecheck_value(newv)
+        return newv 
+
+    def pretty_print(self):
         return self.value
+
+
+
 
 @dataclass
 class Sum(Expression):
     lhs: Expression
     rhs: Expression
+    type = None
     op_name : ClassVar[str]= "sum"
 
     def children(self):
@@ -165,6 +199,7 @@ class Sum(Expression):
 class Difference(Expression):
     lhs: Expression
     rhs: Expression
+    type  = None
     op_name : ClassVar[str]= "diff"
 
 
@@ -185,6 +220,7 @@ class Difference(Expression):
 class Product(Expression):
     lhs: Expression
     rhs: Expression
+    type  = None
     op_name : ClassVar[str]= "mul"
 
     def children(self):
@@ -199,11 +235,19 @@ class Product(Expression):
         return self.lhs.variables | self.rhs.variables
 
     def execute(self,args):
-        return self.lhs.execute(args)*self.rhs.execute(args)
+        result = self.lhs.execute(args)*self.rhs.execute(args)
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
+
+    def pretty_print(self):
+        return "(%s)*(%s)" % (self.lhs.pretty_print(), self.rhs.pretty_print())
+
 
 @dataclass
 class Negation(Expression):
     expr: Expression
+    type  = None
     op_name : ClassVar[str]= "neg"
 
     def children(self):
@@ -218,12 +262,20 @@ class Negation(Expression):
         return self.expr.variables
 
     def execute(self,args):
-        return -1*(self.expr.execute(args))
+        result = -1*(self.expr.execute(args))
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
+
+    def pretty_print(self):
+        return "-(%s)" % (self.expr.pretty_print())
+
 
 @dataclass
 class Quotient(Expression):
     lhs: Expression
     rhs: Expression
+    type  = None
     op_name : ClassVar[str]= "div"
 
     def children(self):
@@ -241,6 +293,7 @@ class Quotient(Expression):
 class VarAssign(Expression):
     lhs : Var
     rhs : Expression
+    type  = None
     op_name : ClassVar[str]= "asgn"
 
     def children(self):
@@ -254,12 +307,17 @@ class VarAssign(Expression):
     def sympy(self) -> sym.Expr:
         raise Exception("cannot turn first order derivative into sympy expression")
 
+    def pretty_print(self):
+        return "%s=%s" % (self.lhs.pretty_print(), self.rhs.pretty_print())
+
+
 
 @dataclass
 class Integrate(Expression):
     ddt_var : Var
     rhs_var : Var
     timestep : float
+    type  = None
     op_name : ClassVar[str]= "integ"
 
     def __post_init__(self):
@@ -277,3 +335,9 @@ class Integrate(Expression):
 class Accumulate(Expression):
     lhs: Expression
     rhs: Expression
+    type  = None
+
+
+    def pretty_print(self):
+        return "%s+=%s" % (self.lhs.pretty_print(), self.rhs.pretty_print())
+
