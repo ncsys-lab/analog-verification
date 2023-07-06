@@ -77,7 +77,6 @@ class FixedPointType(VarType):
 
     def typecast_value(self,value):
         assert(not value is None)
-        assert(value.n >= self.n and value.m >= self.m)
         return self.from_real(float(value))
 
     def typecheck_value(self,value):

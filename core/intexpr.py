@@ -29,6 +29,11 @@ class IntType(VarType):
     def from_fixed_point_type(self,fpt):
         return IntType(nbits=fpt.nbits, signed=fpt.signed, scale=fpt.scale)
 
+    @classmethod
+    def nbits_int(self,v):
+        return len(bin(v))-2
+
+
     def matches(self,other):
         assert(isinstance(other, IntType))
         return other.nbits == self.nbits \
@@ -36,14 +41,24 @@ class IntType(VarType):
                 and other.signed == self.signed
 
     def from_real(self,v):
-        unsc = v/self.scale
-        return min(self.upper,max(self.lower,round(unsc)))
+        unsc = round(v/self.scale)
+        v_tc = min(self.upper,max(self.lower,unsc))
+        if(abs(self.to_real(v_tc) - v) > self.scale):
+            print("[WARN] from_real %f => %f" % (v, self.to_real(v_tc)))
+        return v_tc
 
     def to_real(self,v):
+        v_tc = self.typecast_value(v)
         return v*self.scale
 
     def typecast_value(self,v):
-        return min(self.upper,max(self.lower,v))
+        # always take the top K bits
+        int_bits = IntType.nbits_int(v)
+        v_tc = min(self.upper,max(self.lower,v))
+        if(abs(v_tc - v) > 2**(-self.nbits)):
+            raise Exception("typecast %f => %f" % (v, self.to_real(v_tc)))
+
+        return v_tc
 
     def typecheck_value(self,v):
         assert(isinstance(v,int))

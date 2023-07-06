@@ -61,9 +61,15 @@ def type_relax(t1,t2):
     else:
         raise NotImplementedError
 
+def sign_match(e,signed):
+    if not e.type.signed and signed:
+        return FPToSigned(expr=e)
+    if e.type.signed and not signed:
+        raise NotImplementedError
+
+
 # make 
 def type_match(e,t):
-    print(e)
     if e.type.match(t):
         return e
 
@@ -107,15 +113,22 @@ def fixed_point_expr(reg,expr):
     if isinstance(expr, exprlib.Product):
         lhse =  rec(expr.lhs)
         rhse = rec(expr.rhs)
+        rhse_tm = sign_match(rhse,signed=rhse.type.signed or lhse.type.signed)
+        lhse_tm = sign_match(lhse,signed=rhse.type.signed or lhse.type.signed)
         expr_type = reg.get_type(expr.ident)
-        targ_type = type_relax(lhse.type, rhse.type)
+        prod = exprlib.Product(lhse, rhse)
+        prod.type = FixedPointType.from_integer_scale(integer=rhse.type.integer+lhse.type.integer, \
+                    log_scale=rhse.type.log_scale+lhse.type.log_scale, \
+                    signed=expr_type.signed)
+        prod_typematch = type_match(prod, expr_type)
+        return prod_typematch
 
+    elif isinstance(expr, exprlib.Sum):
+        targ_type = type_relax(lhse.type, rhse.type)
         lhse_tm = type_match(lhse,targ_type)
         rhse_tm = type_match(rhse,targ_type)
         prod = exprlib.Product(lhse_tm, rhse_tm)
-        prod.type = targ_type
-        prod_typematch = type_match(prod, expr_type)
-        return prod_typematch
+        raise Exception("scales must match for sum")
 
     elif isinstance(expr, exprlib.Constant):
         expr.type = reg.get_type(expr.ident)
