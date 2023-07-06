@@ -34,93 +34,92 @@ def constval_to_int(value,typ):
     intval = round(unsc_val)
     return intval 
 
+def typecheck_int_type(node,intt,fpt):
+    infer_intt = IntType.from_fixed_point_type(fpt)
+    if not intt.matches(infer_intt):
+        raise Exception("mismatch %s: int-type=%s | fp-type=%s (scale=%f) int-type=%s" \
+                    % (node.op_name, intt,fpt,fpt.scale, infer_intt))
+
 def fpexpr_to_intexpr(blk,expr):
     def rec(e):
         return fpexpr_to_intexpr(blk,e)
 
     if isinstance(expr, exprlib.Var):
-        info = blk.get_var(expr.name)
-        return exprlib.Var(expr.name, type=info.type)
+        newV = exprlib.Var(expr.name)
+        newV.type = IntType.from_fixed_point_type(expr.type)
+        return newV
 
     elif isinstance(expr, exprlib.Constant):
-        print(expr)
-        raise NotImplementedError
-    elif isinstance(expr, fpexprlib.FPBox) and  \
-        not isinstance(expr.expr, exprlib.Constant):
-        name,typ = get_int_var_and_type(expr)
-        return exprlib.Var(name=name, type=typ)
-    elif isinstance(expr, fpexprlib.FPBox) and  \
-    isinstance(expr.expr, exprlib.Constant):
-        _,typ = get_int_var_and_type(expr)
-        new_value = constval_to_int(expr.expr.value, typ)
-        return exprlib.Constant(new_value)
+        constE = exprlib.Constant(expr.value)
+        constE.type = IntType.from_fixed_point_type(expr.type)
+        return constE
    
     elif isinstance(expr, exprlib.Product):
         nlhs = rec(expr.lhs)
         nrhs = rec(expr.rhs)
-        return exprlib.Product(nlhs,nrhs)
-    elif isinstance(expr, fpexprlib.FPPadRight):
-        newe = rec(expr.expr)
-        return PadR(newe,nbits=int(expr.nbits),value=0)
-    elif isinstance(expr,fpexprlib.FPToSigned):
-        newe = rec(expr.expr)
-        return PadL(newe,nbits=1,value=0)
-    elif isinstance(expr, fpexprlib.FPScale):
-        typ = expr.fp_type()
-        newe = rec(expr.expr)
-        if expr.nbits < 0 and typ.signed:
-            return SHRArith(newe,nbits=abs(expr.nbits))
-        elif expr.nbits > 0 and typ.signed:
-            return SHLArith(newe,nbits=abs(expr.nbits))
-        elif expr.nbits < 0 and not typ.signed:
-            return SHRLogic(newe,nbits=abs(expr.nbits))
-        elif expr.nbits > 0 and not typ.signed:
-            return SHLLogic(newe,nbits=abs(expr.nbits))
+        nexpr = exprlib.Product(nlhs,nrhs)
+        nexpr.type = IntType.from_fixed_point_type(expr.type)
+        return nexpr
+
+    elif isinstance(expr, exprlib.Negation):
+        nexpr = rec(expr.expr)
+        neg = exprlib.Negation(nexpr)
+        neg.type = IntType.from_fixed_point_type(expr.type)
+        return neg
+
+    elif isinstance(expr, fpexprlib.FPToSigned):
+        orig_type = expr.type
+        nexpr = rec(expr.expr)
+        tosgn = ToSInt(PadL(nexpr, nbits=1, value=0))
+        typecheck_int_type(tosgn,tosgn.type, expr.type)
+        return tosgn
+
+    elif isinstance(expr, fpexprlib.FPExtendFrac):
+        nexpr = rec(expr.expr)
+        xtendF = PadR(nexpr,nbits=expr.nbits,value=0)
+        typecheck_int_type(xtendF,xtendF.type, expr.type)
+        return xtendF
+ 
+    elif isinstance(expr, fpexprlib.FPTruncFrac):
+        nexpr = rec(expr.expr)
+        truncF = TruncR(nexpr,nbits=expr.nbits)
+        typecheck_int_type(truncF,truncF.type, expr.type)
+        return truncF
+        
     else:
-        raise Exception("unhandled: %s" % expr)
+        raise Exception("unhandled: %s" % expr.op_name)
 
 
-def build_interim_variable_assign(int_blk,expr):
-    assert(isinstance(expr, fpexprlib.FPBox))
-    name,typ = get_int_var_and_type(expr)
-    if isinstance(expr.expr, exprlib.Constant):
-        newE = exprlib.Constant(constval_to_int(expr.expr.value,typ))
-    else:
-        newE = fpexpr_to_intexpr(int_blk, expr.expr)
+def expr_to_var_name(e):
+    return "%s%d" % (e.op_name, e.ident)
 
-    rel = exprlib.VarAssign(exprlib.Var(name,type=typ), newE)
-    int_blk.decl_relation(rel)
 
 def decl_relations(int_blk,fp_block):
-    for rel in fp_block.relations():
-        for node in rel.nodes():
-            if isinstance(node, fpexprlib.FPBox) and not isinstance(node.expr, exprlib.Var):
-                name,typ = get_int_var_and_type(node)
-                vn = int_blk.decl_var(name=name, kind=blocklib.VarKind.Transient, type=typ)
-
-            if isinstance(node, fpexprlib.FPBox):
-                build_interim_variable_assign(int_blk,node)
-
+    
     for rel in fp_block.relations():
         if isinstance(rel, exprlib.VarAssign):
-            name,typ = get_int_var_and_type(rel.lhs)
+            newlhs = fpexpr_to_intexpr(int_blk, rel.lhs)
             newrhs = fpexpr_to_intexpr(int_blk, rel.rhs)
-            int_blk.decl_relation(VarAssign(exprlib.Var(name,typ), newrhs))
+            int_blk.decl_relation(exprlib.VarAssign(newlhs, newrhs))
 
-        elif isinstance(rel, exprlib.Integrate):
-            name,typ = get_int_var_and_type(rel.lhs)
-            newrhs = fpexpr_to_intexpr(rel.rhs)
-            int_blk.decl_relation(Accumulate(exprlib.Var(name,typ), newrhs))
+        elif isinstance(rel, exprlib.Accumulate):
+            newlhs = fpexpr_to_intexpr(int_blk, rel.lhs)
+            newrhs = fpexpr_to_intexpr(int_blk, rel.rhs)
+            int_blk.decl_relation(exprlib.Accumulate(newlhs, newrhs))
+
+        else:
+            raise Exception("not supported.")
+
+
 
 
 def to_integer(fp_block):
     int_blk = blocklib.AMSBlock(fp_block.name+'-int')
 
     for v in fp_block.vars():
-        name,typ = get_int_var_and_type(fpexprlib.FPBox(exprlib.Var(v.name,v.type),v.type))
-        vn = int_blk.decl_var(name=name, kind=v.kind, type=typ)
+        typ = IntType.from_fixed_point_type(v.type)
+        int_blk.decl_var(name=v.name, kind=v.kind, type=typ)
        
     decl_relations(int_blk, fp_block)
     return int_blk 
     
-    raise NotImplementedError

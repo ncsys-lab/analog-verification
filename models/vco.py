@@ -4,23 +4,24 @@ import core.intervals as intervallib
 
 import core.fixedpoint as fixlib
 
-def make_vco(timestep=1e-3):
+def make_vco(timestep=1e-3,rel_prec=0.001):
     vco = AMSBlock("vco")
 
     #w = vco.decl_input(Real("w"))
     #out = vco.decl_output(Real("out"))
 
-    w = vco.decl_var("w", kind=VarKind.Input, type=RealType(lower=0,upper=1,prec=0.001))
-    x = vco.decl_var("x", kind=VarKind.StateVar, type=RealType(lower=-1,upper=1,prec=0.001))
-    v = vco.decl_var("v", kind=VarKind.StateVar, type=RealType(lower=-1,upper=1,prec=0.001)) 
+    w = vco.decl_var("w", kind=VarKind.Input, type=RealType(lower=0,upper=1,prec=rel_prec*1.0))
+    x = vco.decl_var("x", kind=VarKind.StateVar, type=RealType(lower=-1,upper=1,prec=rel_prec*2.0))
+    v = vco.decl_var("v", kind=VarKind.StateVar, type=RealType(lower=-1,upper=1,prec=rel_prec*2.0)) 
     out = vco.decl_var("out", kind=VarKind.Output, type=x.type)
 
     dvdt = vco.decl_var("dvdt", kind=VarKind.Transient,  \
-            type=intervallib.real_type_from_expr(vco, -(w*w)*x, rel_prec=0.01))
+            type=intervallib.real_type_from_expr(vco, -(w*w)*x, rel_prec=rel_prec))
     dxdt = vco.decl_var("dxdt", kind=VarKind.Transient, \
-            type=intervallib.real_type_from_expr(vco, x, rel_prec=0.01))
+            type=intervallib.real_type_from_expr(vco, x, rel_prec=rel_prec))
 
-    vco.decl_relation(VarAssign(dvdt, -(w*w)*x))
+    expr = VarAssign(dvdt, -(w*w)*x)
+    vco.decl_relation(expr)
     vco.decl_relation(VarAssign(dxdt, v))
     vco.decl_relation(VarAssign(out, x))
 

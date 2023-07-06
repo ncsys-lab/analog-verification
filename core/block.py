@@ -26,6 +26,9 @@ class VarInfo:
     def stateful(self):
         return self.kind == VarKind.StateVar
 
+    def pretty_print(self):
+        return "%s %s : %s" % (self.kind.value, self.name, self.type)
+
 class AMSBlock:
 
     def __init__(self,name):
@@ -74,7 +77,7 @@ class AMSBlock:
         def q(s):
             stmts.append(s)
         for v in self.vars():
-            q(str(v))
+            q("var "+v.pretty_print())
         q("")
         for r in self.relations():
             q(r.pretty_print())

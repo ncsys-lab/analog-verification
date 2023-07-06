@@ -58,6 +58,10 @@ class FixedPointType(VarType):
         return self.n_integer_bits
 
     @property
+    def nbits(self):
+        return self.n_fractional_bits + self.n_integer_bits
+
+    @property
     def n_integer_bits(self):
         return self.integer + (1 if self.signed else 0)
 
@@ -121,6 +125,7 @@ class FPOp(Expression):
 @dataclass
 class FPTruncFrac(FPOp):
     nbits : int
+    op_name : ClassVar[str]= "truncF"
 
     @property
     def type(self):
@@ -150,6 +155,7 @@ class FPTruncFrac(FPOp):
 @dataclass
 class FPExtendFrac(FPOp):
     nbits : int
+    op_name : ClassVar[str]= "extF"
 
     @property
     def type(self):
@@ -175,12 +181,14 @@ class FPExtendFrac(FPOp):
 @dataclass
 class FPExtendInt(FPOp):
     nbits : int
+    op_name : ClassVar[str]= "extI"
 
 
 
 @dataclass
 class FPToSigned(FPOp):
     expr : Expression
+    op_name : ClassVar[str]= "toSgn"
 
     @property
     def type(self):

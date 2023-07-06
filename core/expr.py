@@ -328,6 +328,9 @@ class Integrate(Expression):
     def children(self):
         return [self.lhs, self.rhs]
 
+    def pretty_print(self):
+        return "%s+=%s" % (self.lhs.pretty_print(), self.rhs.pretty_print())
+
 
 
 
