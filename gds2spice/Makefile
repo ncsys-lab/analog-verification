@@ -2,4 +2,8 @@ export PDK_ROOT?=~/Desktop/AchourLab/open_pdks/sky130/sky130A/libs.tech/magic/sk
 #runs magic in terminal
 
 %.spice: %.gds
-	tclsh magictest.tcl $(PDK_ROOT) ./$*
+	echo %
+	tclsh magictest.tcl $(PDK_ROOT) ./$* 
+
+clean: 
+	rm *.ext
