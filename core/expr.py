@@ -60,7 +60,7 @@ class TimeType(VarType):
 
 @dataclass
 class Expression:
-    type : Optional[VarType] = field(default=False,init=False) 
+    type : Optional[VarType] = field(default=None,init=False) 
     ident : int = field(default_factory=count().__next__,init=False)
 
     def children(self):
@@ -154,9 +154,36 @@ class Var(Expression):
         return self.name
 
 @dataclass
+class Param(Expression):
+    name: str
+    value: float
+    op_name : ClassVar[str] = "param"
+
+    @property
+    def isReal(self):
+        return isinstance(self.type, RealType) 
+
+    @property
+    def sympy(self) -> sym.Expr:
+        return sym.Symbol(self.name, real=True)
+
+    @property
+    def variables(self) -> "Set[Real]":
+        return set([self])
+
+    def execute(self,args):
+        newv = self.type.from_real(self.value)
+        self.type.typecheck_value(newv)
+        return newv 
+
+    def pretty_print(self):
+        return self.name
+
+@dataclass
 class Constant(Expression):
     value: float
     op_name : ClassVar[str]= "const"
+    
 
     @property
     def sympy(self) -> sym.Expr:
@@ -165,6 +192,15 @@ class Constant(Expression):
     @property
     def variables(self) -> "Set[Real]":
         return set()
+    
+    @property
+    def interval(self):
+        inte = self.type.interval
+        return inte
+    
+    @property
+    def prec(self):
+        return self.type.prec
 
     def execute(self,args):
         newv = self.type.from_real(self.value)
@@ -173,6 +209,15 @@ class Constant(Expression):
 
     def pretty_print(self):
         return self.value
+    
+    def __post_init__(self):
+        self.type = RealType(self.value, self.value, 0.001 * abs(self.value)) #needed to abs so std is not negative
+        self.type_name = "real" #added to work with execution
+
+    #def isType(self,other): #added this as well. 
+    #    return self.type_name == other.type_name
+
+
 
 
 
@@ -194,6 +239,13 @@ class Sum(Expression):
     @property
     def variables(self) -> "Set[Real]":
         return self.lhs.variables | self.rhs.variables
+    
+    def execute(self, args):
+        print(self.rhs)
+        result = self.lhs.execute(args) + self.rhs.execute(args)
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
 
 @dataclass
 class Difference(Expression):

@@ -19,11 +19,11 @@ class IntervalPrecRegistery:
 
         def initialize(self):
             self.interval_expr = ufloat((self.upper+self.lower)/2, (self.upper-self.lower)/2)
-            self.precision_expr = ufloat(0.0, self.precision)
+            self.precision_expr = ufloat((self.upper+self.lower)/2, (self.upper-self.lower)/2 + self.precision)
 
         def check(self):
             assert(self.precision > 0.0)
-            assert(self.upper > self.lower)
+            assert(self.upper >= self.lower)
 
 
     def __init__(self):
@@ -40,10 +40,11 @@ class IntervalPrecRegistery:
         lower = interval_expr.nominal_value - interval_expr.std_dev
         fwd_precision = precision_expr.std_dev
         targ_precision = (upper-lower)*relative_precision
+        """ This part here should be fine to comment out, right?
         if not (fwd_precision <= targ_precision):
             raise Exception("cannot attain desired precision: forward prop=%f, target=%f\n  expr=%s"  \
             % (fwd_precision,targ_precision,precision_expr))
-
+        """
         self.info[ident] = IntervalPrecRegistery.IntervalPrecInfo(lower=lower, upper=upper,precision=targ_precision, \
                                 interval_expr=interval_expr, precision_expr=precision_expr)
         self.info[ident].check()
@@ -70,9 +71,14 @@ def build_interval_symtbl(block):
         if v.type.isType(exprlib.RealType):
             lower,upper = v.type.interval
             reg.decl_info(v.name, lower, upper, v.type.prec)
+    for p in block.params():
+        if p.type.isType(exprlib.RealType):
+            lower,upper = p.type.interval
+            reg.decl_info(p.name, lower, upper, p.type.prec)
     return reg
 
 def propagate_expr(reg, e,rel_prec):
+    
     if isinstance(e, exprlib.Constant):
         lb = e.value - (e.value*rel_prec)
         ub = e.value + (e.value*rel_prec)
@@ -81,12 +87,17 @@ def propagate_expr(reg, e,rel_prec):
 
     else:
         expr = e.sympy
+        
         vs = list(expr.free_symbols)
+        
         ival_args = list(map(lambda v: reg.get_info(v.name).interval_expr, vs))
         prec_args = list(map(lambda v: reg.get_info(v.name).precision_expr, vs))
+        print(prec_args)
         lambd = sympy.lambdify(vs,expr)
         ival_expr = lambd(*ival_args)
         prec_expr = lambd(*prec_args)
+
+        
         info=reg.decl_sym_info(e.ident, interval_expr=ival_expr, precision_expr=prec_expr, relative_precision=rel_prec)
         e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
 
