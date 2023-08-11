@@ -118,14 +118,17 @@ def fpexpr_to_intexpr(blk,expr):
         usignF= ToUSInt(expr=nexpr)
         print("type_result usignF: {}".format(usignF.type))
         print(expr.type)
+        print("child expr:", expr.expr)
         typecheck_int_type(usignF,usignF.type, expr.type)
         return usignF
 
     elif isinstance(expr, exprlib.Sum):
-        nexpr = rec(expr.lhs)
-        nexpr = rec(expr.rhs)
-        sumop = exprlib.Sum(expr.lhs, expr.rhs)
+        expr_lhs = rec(expr.lhs)
+        expr_rhs = rec(expr.rhs)
+        sumop = exprlib.Sum(expr_lhs, expr_rhs)
         sumop.type = IntType.from_fixed_point_type(expr.type)
+        assert(expr_lhs.nbits == expr_rhs.nbits)
+        typecheck_int_type(sumop,sumop.type, expr.type)
         return sumop
 
     elif isinstance(expr, fpexprlib.FPExtendInt):

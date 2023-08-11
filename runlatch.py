@@ -233,7 +233,7 @@ for i in range(SIM_TICKS):
     
 plt.plot(t,o)
 plt.xlabel('')
-plt.show()
+plt.savefig("resp.png")
 
 
 ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec = 0.01)
