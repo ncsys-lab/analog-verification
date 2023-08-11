@@ -71,7 +71,7 @@ class FixedPointType(VarType):
 
     @property
     def n_integer_bits(self):
-        return self.integer + (1 if self.signed else 0)
+        return self.integer
 
     @property
     def n_fractional_bits(self):

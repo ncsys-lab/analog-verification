@@ -136,6 +136,10 @@ def fpexpr_to_intexpr(blk,expr):
         print(expr.rhs)
         print(expr.rhs.type)
         print(expr_rhs.type)
+
+        print('===expr===')
+        print(expr.type)
+        print(sumop.type)
         assert(expr_lhs.nbits == expr_rhs.nbits)
         typecheck_int_type(sumop,sumop.type, expr.type)
         return sumop
