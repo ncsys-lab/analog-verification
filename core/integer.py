@@ -145,8 +145,12 @@ def fpexpr_to_intexpr(blk,expr):
         return sumop
 
     elif isinstance(expr, fpexprlib.FPExtendInt):
+        
         eexpr = rec(expr.expr)
         exint = PadL(expr=eexpr,nbits=expr.nbits,value=0)
+        print('===expr===')
+        print(eexpr.type)
+        print(exint.type)
         typecheck_int_type(exint,exint.type,expr.type)
         return exint
     

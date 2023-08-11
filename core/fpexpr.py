@@ -193,7 +193,7 @@ class FPExtendInt(FPOp):
     @property
     def type(self):
         fpt = self.expr.type
-        return FixedPointType.from_integer_scale(integer= fpt.integer + self.nbits, log_scale=fpt.log_scale, signed=True)
+        return FixedPointType.from_integer_scale(integer= fpt.integer + self.nbits, log_scale=fpt.log_scale, signed=fpt.signed)
     
     #Added by will
     def execute(self, args):
