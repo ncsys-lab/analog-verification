@@ -6,7 +6,7 @@ from copy import *
 class FSMAMSBlock:
 
     #In reality, evaluate_dt_division should be a factor of 2**n, othewise it becomes hairy to divide the clock.
-    def __init__(self, system_dt, evaluate_dt_division, initializer, starting_state = None, ):
+    def __init__(self, system_dt, evaluate_dt_division, initializer, starting_state = None):
         self.nodes = {}
         self.edges  = {}
         self.starting_state = starting_state
@@ -24,6 +24,7 @@ class FSMAMSBlock:
         
     
     def addNode(self, node):
+        assert not (node.name in self.nodes.keys())
         self.nodes[node.name] = node
         self.edges[node.name] = []
 
@@ -43,6 +44,9 @@ class FSMAMSBlock:
             snk_name = self.new_node_arr[i + 1].name
             edge_copy.src = self.nodes[src_name]
             edge_copy.snk = self.nodes[snk_name]
+            
+
+        return node_copy
 
 
             
@@ -55,29 +59,38 @@ class FSMAMSBlock:
 
     def evaluationClockTick(self):
         #This will be triggered by the external system clock in reality. Here it is represented by an event-based trigger.
-        if(self.evaluate_cycles == self.evaluate_dt_division):
+        self.evaluate_cycles = self.evaluate_cycles + 1
+        self.event_this_cycle = None
+
+        if(self.evaluate_cycles % self.evaluate_dt_division == 0):
             self.event_this_cycle = ClockCondition.Transition.POSEDGE
-        elif(self.evaluate_cycles == self.evaluate_dt_division // 2):
+            
+        elif(self.evaluate_cycles % (self.evaluate_dt_division // 2) == 0):
             self.event_this_cycle = ClockCondition.Transition.NEGEDGE
 
         self.state_vars = execute_block(self.state.block, self.state_vars)
 
         for edge in self.edges[self.state.name]:
-            print(self._conditionTrue(edge))
-            if( self._conditionTrue(edge) ):
+            #print(self._conditionTrue(edge))
+            if( self._conditionTrue(edge.cond) ):
+                
                 self.state = edge.dest_node
-                break
+                self.evaluate_cycles = 0
+                self.event_this_cycle = None
+                return
         
-        self.evaluate_cycles = self.evaluate_cycles + 1
-        self.event_this_cycle = None
+        
+        
 
-    def _conditionTrue(self, edge):
-        if(isinstance(edge.cond, ClockCondition)):
-            return (edge.cond.transition_type == self.event_this_cycle)
-        elif(isinstance(edge.cond, NoCondition)):
+    def _conditionTrue(self, cond):
+        if(isinstance(cond, ClockCondition)):
+            return (cond.transition_type == self.event_this_cycle) and self._conditionTrue(cond.extra_cond)
+        elif(isinstance(cond, NoCondition)):
             return True
-        elif(isinstance(edge.cond, AnalogSignalCondition)):
-            return True
+        elif(isinstance(cond, AnalogSignalCondition)):
+            return ( self.state_vars[cond.expr] > cond.range[0] ) and ( self.state_vars[cond.expr] <= cond.range[1])
+        elif(isinstance(cond, AnalogTimeCondition)):
+            return(self.evaluate_cycles * self.evaluate_dt >= cond.duration_var.variable.execute(self.state_vars))
         
     def setEvent(self, event):
         self.event_this_cycle = event
@@ -115,16 +128,22 @@ class ClockCondition:
         POSEDGE = 0
         NEGEDGE = 1
 
-    def __init__(self, transition_type):
+    def __init__(self, transition_type, extra_cond = NoCondition()):
         self.transition_type = transition_type
+        self.extra_cond = extra_cond
 
-    
 
 class AnalogSignalCondition:
 
-    def __init__(self, expr, range):
+    def __init__(self, expr : str, range): #if variable falls within range, we transition. 
+        assert isinstance(expr, str)
         self.expr = expr 
         self.range = range
+
+class AnalogTimeCondition:
+    def __init__(self, duration_var): #If the time we are in a state exceeds duration_var, we transition
+        assert isinstance(duration_var, VarInfo)
+        self.duration_var = duration_var
 
 """
 'evaluate_high' :         

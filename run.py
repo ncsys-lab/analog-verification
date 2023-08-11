@@ -4,6 +4,7 @@ import core.integer as intlib
 import core.intervals as intervallib
 import core.block as blocklib
 import matplotlib.pyplot as plt
+import core.rtl as rtllib
 
 def validate_model(blk,timestep,figname):
     print(blk)
@@ -40,6 +41,7 @@ print("\n")
 input("press any key to run simulation..")
 validate_model(block, timestep, "orig_dynamics.png")
 
+
 fp_block = fixlib.to_fixed_point(ival_reg, block)
 print("------ Fixed Point AMS Block -----")
 print(fp_block)
@@ -53,3 +55,8 @@ print(int_block)
 print("\n")
 input("press any key to run simulation..")
 validate_model(int_block, timestep, "int_dynamics.png")
+
+
+rtl_block = rtllib.RTLBlock(int_block)
+
+rtl_block.print_verilog_src()

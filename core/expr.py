@@ -241,7 +241,6 @@ class Sum(Expression):
         return self.lhs.variables | self.rhs.variables
     
     def execute(self, args):
-        print(self.rhs)
         result = self.lhs.execute(args) + self.rhs.execute(args)
         tc_result = self.type.typecast_value(result)
         self.type.typecheck_value(tc_result)
@@ -267,6 +266,12 @@ class Difference(Expression):
     @property
     def variables(self) -> "Set[Real]":
         return self.lhs.variables | self.rhs.variables
+    
+    def execute(self, args):
+        result = self.lhs.execute(args) - self.rhs.execute(args)
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
 
 @dataclass
 class Product(Expression):
@@ -340,6 +345,12 @@ class Quotient(Expression):
     @property
     def variables(self) -> "Set[Real]":
         return self.lhs.variables | self.rhs.variables
+    
+    def execute(self, args):
+        result = self.lhs.execute(args) / self.rhs.execute(args)
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
 
 @dataclass
 class VarAssign(Expression):

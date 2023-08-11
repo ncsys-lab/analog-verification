@@ -39,7 +39,12 @@ class IntervalPrecRegistery:
         upper = interval_expr.nominal_value + interval_expr.std_dev
         lower = interval_expr.nominal_value - interval_expr.std_dev
         fwd_precision = precision_expr.std_dev
-        targ_precision = (upper-lower)*relative_precision
+        
+        if(upper - lower == 0.0):
+            targ_precision = abs(upper)  * relative_precision
+        else:
+            targ_precision = (upper-lower)*relative_precision
+        #print(targ_precision)
         """ This part here should be fine to comment out, right?
         if not (fwd_precision <= targ_precision):
             raise Exception("cannot attain desired precision: forward prop=%f, target=%f\n  expr=%s"  \
@@ -47,6 +52,10 @@ class IntervalPrecRegistery:
         """
         self.info[ident] = IntervalPrecRegistery.IntervalPrecInfo(lower=lower, upper=upper,precision=targ_precision, \
                                 interval_expr=interval_expr, precision_expr=precision_expr)
+        #print(ident)
+        #print(interval_expr)
+        #print(precision_expr)
+
         self.info[ident].check()
         return self.info[ident]
 
@@ -92,7 +101,7 @@ def propagate_expr(reg, e,rel_prec):
         
         ival_args = list(map(lambda v: reg.get_info(v.name).interval_expr, vs))
         prec_args = list(map(lambda v: reg.get_info(v.name).precision_expr, vs))
-        print(prec_args)
+
         lambd = sympy.lambdify(vs,expr)
         ival_expr = lambd(*ival_args)
         prec_expr = lambd(*prec_args)

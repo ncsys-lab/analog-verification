@@ -79,6 +79,7 @@ class IntOp(Expression):
         raise Exception("not implemented: %s" % (self))
 
 
+
 class ToSInt(IntOp):
 
     @property
@@ -94,18 +95,35 @@ class ToSInt(IntOp):
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
+    
+@dataclass
+class ToUSInt(IntOp):
+    op_name: ClassVar[str] = "toUsInt"
+
+    @property
+    def type(self):
+        typ = self.expr.type
+        return IntType(nbits=typ.nbits, scale=typ.scale, signed=False)
+
+
+    def pretty_print(self):
+        raise NotImplementedError
+
+    def execute(self,args):
+        raise NotImplementedError
 
 
 
 @dataclass
 class TruncR(IntOp):
     nbits : int
-    op_name : ClassVar[str]= "padr"
+    op_name : ClassVar[str]= "truncR"
 
     @property
     def type(self):
         typ = self.expr.type
         new_scale = typ.scale*(2**(self.nbits))
+        assert(self.nbits > 0)
         return IntType(nbits=typ.nbits - self.nbits, scale=new_scale, signed=typ.signed)
 
     def pretty_print(self):
@@ -164,3 +182,19 @@ class PadL(IntOp):
     def pretty_print(self):
         return "padl(%s,%s,%d)" % (self.expr.pretty_print(), self.nbits, self.value)
 
+@dataclass
+class TruncVal(IntOp): #Will
+    nbits : int 
+    value : int
+    op_name : ClassVar[str]= 'truncval'
+
+    @property
+    def type(self):
+        typ = self.expr.type
+        return IntType(nbits = typ.nbits - self.nbits, scale=typ.scale, signed = typ.signed)
+
+    def execute(self, args):
+        raise NotImplementedError
+
+    def pretty_print(self):
+        raise NotImplementedError

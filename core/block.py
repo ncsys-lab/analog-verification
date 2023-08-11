@@ -7,8 +7,8 @@ from core.expr import VarType, Var, VarAssign, Integrate, Accumulate, Param, Con
 class VarKind(Enum):
     Input = "input"
     Output = "output"
-    StateVar = "state-var"
-    Transient = "trans"
+    StateVar = "reg"
+    Transient = "wire"
     Time = "time"
 
 @dataclass
@@ -21,6 +21,7 @@ class VarInfo:
     def __post_init__(self):
         self.variable = Var(self.name)
         self.variable.type = self.type
+        #print("Variable Type: {}".format(self.variable.type))
 
     @property 
     def stateful(self):
@@ -37,7 +38,9 @@ class ParamInfo:
     def __post_init__(self):
         self.variable = Param(self.name, self.constant.value)
         self.variable.type = self.constant.type
+        #print("Param Variable Type: {}".format(self.variable.type))
         self.type = self.constant.type
+        #print(self.type)
         self.kind = VarKind.Transient
 
 class AMSBlock:
@@ -111,7 +114,7 @@ def execute_block(blk, args):
     vals = dict(args)
     for rel in blk.relations():
         if isinstance(rel, VarAssign):
-            print(rel.rhs)
+            #print(rel.rhs)
             rhs_val = rel.rhs.execute(vals)
             vals[rel.lhs.name] = rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Integrate):

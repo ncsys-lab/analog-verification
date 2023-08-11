@@ -40,6 +40,8 @@ def fixed_point_reprs(ival_reg):
     return reg
 
 def type_relax(t1,t2):
+    
+    print(t1, t2)
     if t1.match(t2):
         return t1
 
@@ -70,11 +72,16 @@ def sign_match(e,signed):
 
 # make 
 def type_match(e,t):
+    
+    print(e.type,t)
     if e.type.match(t):
         return e
 
     if not e.type.signed and t.signed:
         return type_match(FPToSigned(expr=e),t)
+    
+    if e.type.signed and not t.signed:
+        return type_match(FPToUnsigned(expr=e),t)
 
     if e.type.fractional < t.fractional:
         return type_match(FPExtendFrac(expr=e,nbits=t.fractional - e.type.fractional), t)
@@ -88,19 +95,22 @@ def type_match(e,t):
             return type_match(FPTruncInt(FPTruncFrac(expr=e, nbits=e.type.fractional), nbits=rem_trunc), t)
 
 
-
+    # risky will addition
     if e.type.integer != t.integer:
-        print(e.type, t)
-        raise NotImplementedError
+        if(e.type.integer < t.integer):
+            nbits = t.integer
+            return type_match(FPExtendInt(nbits = nbits, expr = e), t)
+        else:
+            nbits = e.type.integer - t.integer
+            return type_match(FPTruncInt(nbits = nbits, expr = e), t)
 
     if e.type.scale != t.scale:
-        print(e.type, t)
         raise NotImplementedError
 
     if e.type.fractional > t.fractional:
-        print(e.type, t)
         raise NotImplementedError
 
+    print('idkwyn')
     raise NotImplementedError
 
     
@@ -108,6 +118,7 @@ def fixed_point_expr(reg,expr):
     def rec(e):
         new_e = fixed_point_expr(reg,e)
         return new_e
+    
 
 
     if isinstance(expr, exprlib.Product):
@@ -120,15 +131,53 @@ def fixed_point_expr(reg,expr):
         prod.type = FixedPointType.from_integer_scale(integer=rhse.type.integer+lhse.type.integer, \
                     log_scale=rhse.type.log_scale+lhse.type.log_scale, \
                     signed=expr_type.signed)
+        print('e: {}'.format(prod))
+        print('t: {}'.format(expr_type))
+        prod_typematch = type_match(prod, expr_type)
+        return prod_typematch
+    
+    if isinstance(expr, exprlib.Quotient): #added by will
+        lhse =  rec(expr.lhs)
+        rhse = rec(expr.rhs)
+        rhse_tm = sign_match(rhse,signed=rhse.type.signed or lhse.type.signed)
+        lhse_tm = sign_match(lhse,signed=rhse.type.signed or lhse.type.signed)
+        expr_type = reg.get_type(expr.ident)
+        prod = exprlib.Quotient(lhse, rhse)
+        prod.type = FixedPointType.from_integer_scale(integer=lhse.type.integer - rhse.type.integer, \
+                    log_scale=lhse.type.log_scale - rhse.type.log_scale, \
+                    signed=expr_type.signed)
+        print('e: {}'.format(prod))
+        print('t: {}'.format(expr_type))
         prod_typematch = type_match(prod, expr_type)
         return prod_typematch
 
-    elif isinstance(expr, exprlib.Sum):
+    elif isinstance(expr, exprlib.Sum): #improved by will
+        lhse = rec(expr.lhs)
+        rhse = rec(expr.rhs)
+        print(lhse)
+        print(rhse)
+
+        print("entering type_relax")
         targ_type = type_relax(lhse.type, rhse.type)
         lhse_tm = type_match(lhse,targ_type)
         rhse_tm = type_match(rhse,targ_type)
-        prod = exprlib.Product(lhse_tm, rhse_tm)
-        raise Exception("scales must match for sum")
+        prod = exprlib.Sum(lhse_tm, rhse_tm)
+        prod.type = targ_type
+        return prod
+    
+    elif isinstance(expr, exprlib.Difference): #improved by will
+        lhse = rec(expr.lhs)
+        rhse = rec(expr.rhs)
+        print(lhse)
+        print(rhse)
+
+        print("entering type_relax")
+        targ_type = type_relax(lhse.type, rhse.type)
+        lhse_tm = type_match(lhse,targ_type)
+        rhse_tm = type_match(rhse,targ_type)
+        prod = exprlib.Difference(lhse_tm, rhse_tm)
+        prod.type = targ_type
+        return prod
 
     elif isinstance(expr, exprlib.Constant):
         expr.type = reg.get_type(expr.ident)
@@ -145,6 +194,10 @@ def fixed_point_expr(reg,expr):
         return neg_expr
 
     elif isinstance(expr, exprlib.Var):
+        expr.type = reg.get_type(expr.name)
+        return expr
+    
+    elif isinstance(expr, exprlib.Param):
         expr.type = reg.get_type(expr.name)
         return expr
 
@@ -176,8 +229,17 @@ def fixed_point_block(reg,block):
     for v in block.vars():
         typ = fixed_point_var(reg,v)
         fp_block.decl_var(name=v.name, type=typ, kind=v.kind)
-  
+
+    for p in block.params():
+        typ = fixed_point_var(reg,p)
+        print(typ)
+        fp_block.decl_param(name=p.name, value=p.constant)
+        fp_block._params[p.name].constant.type = typ
+        fp_block._params[p.name].type = typ
+        
+
     for rel in block.relations():
+        print("stariting relation {}: {}".format(rel.ident, rel))
         if isinstance(rel,exprlib.VarAssign):
             eq_expr = fixed_point_expr(reg,rel)
             fp_block.decl_relation(eq_expr)

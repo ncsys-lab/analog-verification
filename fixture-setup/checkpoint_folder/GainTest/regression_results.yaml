@@ -1,0 +1,26 @@
+out_cm:
+  cm_gain:
+    (<fixture.signals.SignalIn object at 0x7fb816b531c0>, <fixture.signals.SignalIn object at 0x7fb816b531c0>): 0.004112895883311651
+    <None / v_fz>: -0.008333884151767279
+    const_1: 0.003946930102133095
+  cm_offset:
+    (<fixture.signals.SignalIn object at 0x7fb816b531c0>, <fixture.signals.SignalIn object at 0x7fb816b531c0>): -2.7498353147248356e-05
+    <None / v_fz>: 5.48715481273887e-05
+    const_1: 1.2984747924720392
+  gain_to_cm:
+    (<fixture.signals.SignalIn object at 0x7fb816b531c0>, <fixture.signals.SignalIn object at 0x7fb816b531c0>): 0.001557564775996667
+    <None / v_fz>: -0.0032714745262438782
+    const_1: 0.0016000910069564611
+out_diff:
+  gain:
+    (<fixture.signals.SignalIn object at 0x7fb816b531c0>, <fixture.signals.SignalIn object at 0x7fb816b531c0>): 1.1636220629265437
+    <None / v_fz>: -3.2464617559484967
+    const_1: 3.0169616340074397
+  gain_from_cm:
+    (<fixture.signals.SignalIn object at 0x7fb816b531c0>, <fixture.signals.SignalIn object at 0x7fb816b531c0>): 0.0753061850150159
+    <None / v_fz>: -0.1459012112126461
+    const_1: 0.06044012141148747
+  offset:
+    (<fixture.signals.SignalIn object at 0x7fb816b531c0>, <fixture.signals.SignalIn object at 0x7fb816b531c0>): 0.00044399113692460135
+    <None / v_fz>: -0.000678891875269455
+    const_1: 0.00016647498765576946
