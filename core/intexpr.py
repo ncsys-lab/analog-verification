@@ -81,6 +81,7 @@ class IntOp(Expression):
 
 
 class ToSInt(IntOp):
+    op_name: ClassVar[str] = "toSInt"
 
     @property
     def type(self):
