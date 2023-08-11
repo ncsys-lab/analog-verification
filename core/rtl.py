@@ -32,7 +32,7 @@ class RTLBlock:
                 self.regs[v.name] = self.m.Reg(v.name, v.type.nbits)
 
         for p in block.params():
-            self.params[p.name] = self.m.Parameter(p.name, p.variable.type.value)
+            self.params[p.name] = self.m.Parameter(p.name, p.constant.value)
 
         self.seq = Seq(self.m, 'regassn', self.inputs['eval_clk'], self.inputs['reset'])
 
