@@ -96,7 +96,7 @@ def fpexpr_to_intexpr(blk,expr):
     elif isinstance(expr, fpexprlib.FPToSigned):
         orig_type = expr.type
         nexpr = rec(expr.expr)
-        tosgn = ToSInt(PadL(nexpr, nbits=1, value=0))
+        tosgn = ToSInt(expr = nexpr)
         typecheck_int_type(tosgn,tosgn.type, expr.type)
         return tosgn
 
