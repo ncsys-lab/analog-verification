@@ -127,6 +127,15 @@ def fpexpr_to_intexpr(blk,expr):
         expr_rhs = rec(expr.rhs)
         sumop = exprlib.Sum(expr_lhs, expr_rhs)
         sumop.type = IntType.from_fixed_point_type(expr.type)
+        print("=== lhs ===")
+        print(expr.lhs)
+        print(expr.lhs.type)
+        print(expr_lhs.type)
+
+        print("=== rhs ===")
+        print(expr.rhs)
+        print(expr.rhs.type)
+        print(expr_rhs.type)
         assert(expr_lhs.nbits == expr_rhs.nbits)
         typecheck_int_type(sumop,sumop.type, expr.type)
         return sumop
