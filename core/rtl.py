@@ -95,11 +95,11 @@ class RTLBlock:
             return self.traverse_expr_tree(relation.lhs)[0] / self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, TruncR)):
             #You can't truncate epressions, only wires in verilog, so you need to create an intermediate wire
-            wire_name = relation.op_name + str(next(self.namecounter))
+            wire_name = relation.op_name + "_" + str(next(self.namecounter))
             print(wire_name)
-            self.wires[wire_name] = self.m.Wire(wire_name, relation.type.nbits)
+            self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
             self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-            return (self.wires[wire_name][:relation.type.nbits]), relation.type.nbits
+            return (self.wires[wire_name][relation.nbits:]), relation.type.nbits
         elif(isinstance(relation, ToUSInt)):
             
             if(relation.type.signed):
@@ -109,6 +109,7 @@ class RTLBlock:
             return retval, relation.type.nbits
         
         else:
+            print("ERROR, {} IS NOT IMPLEMENTED!!!".format(relation))
             raise NotImplementedError
         
     def generate_pymtl_wrapper(self):
