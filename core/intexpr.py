@@ -108,10 +108,13 @@ class ToUSInt(IntOp):
 
 
     def pretty_print(self):
-        raise NotImplementedError
+        return "toUsInt(%s)" % (self.expr.pretty_print())
 
     def execute(self,args):
-        raise NotImplementedError
+        val = self.expr.execute(args)
+        val_tc = self.type.typecast_value(val)
+        self.type.typecheck_value(val_tc)
+        return val_tc
 
 
 
@@ -155,7 +158,7 @@ class PadR(IntOp):
         return "padr(%s,%s,%d)" % (self.expr.pretty_print(), self.nbits, self.value)
 
     def execute(self,args):
-        val = self.expr.execute(args)<<self.nbits
+        val = self.expr.execute(args) << self.nbits
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
@@ -194,8 +197,11 @@ class TruncVal(IntOp): #Will
         typ = self.expr.type
         return IntType(nbits = typ.nbits - self.nbits, scale=typ.scale, signed = typ.signed)
 
-    def execute(self, args):
-        raise NotImplementedError
+    def execute(self,args):
+        val = self.expr.execute(args)>>self.nbits
+        val_tc = self.type.typecast_value(val)
+        self.type.typecheck_value(val_tc)
+        return val_tc
 
     def pretty_print(self):
-        raise NotImplementedError
+        return 'truncval(%s,%s,%da)' % (self.expr.pretty_print(), self.nbits, self.value)

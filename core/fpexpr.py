@@ -92,7 +92,7 @@ class FixedPointType(VarType):
         if not self.signed and value.signed:
             raise Exception("mismatch on sign type=%s value=%s\n  %s" % (self.signed, value.signed,msg))
 
-        if self.m != value.m:
+        if self.m != value.m - int(value.signed):
             raise Exception("integer size mismatch type=%d value=%d\n   %s" % (self.m,value.m,msg))
 
         if self.n != value.n:
@@ -112,7 +112,7 @@ class FixedPointType(VarType):
         else:
             nvalue = int(round(float(value)/self.scale))*self.scale
 
-        fpn = FixedPoint(nvalue, m=self.m, n=self.n, signed=self.signed,  
+        fpn = FixedPoint(nvalue, m=self.m + int(self.signed), n=self.n, signed=self.signed,  
             overflow="clamp", overflow_alert='ignore')
         self.typecheck_value(fpn)
         if abs(float(fpn) - value) > self.scale:
@@ -145,7 +145,8 @@ class FPTruncFrac(FPOp):
     def execute(self,args):
         value = FixedPoint(self.expr.execute(args))
         new_bitvec= bin(value.bits >> self.nbits)
-        new_value = FixedPoint(new_bitvec, n=self.type.n, m=self.type.m, signed=self.type.signed)
+
+        new_value = FixedPoint(new_bitvec, n=self.type.n, m=self.type.m + int(self.type.signed), signed=self.type.signed)
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > self.type.scale:
             raise Exception("Fractional truncate produced incorrect value: original=%f, truncated=%f" % (float(value), float(new_value)))
@@ -175,7 +176,7 @@ class FPExtendFrac(FPOp):
     def execute(self,args):
         value = FixedPoint(self.expr.execute(args))
         new_bitvec=bin(value.bits << self.nbits)
-        new_value = FixedPoint(new_bitvec, n=self.type.n, m=self.type.m, signed=self.type.signed)
+        new_value = FixedPoint(new_bitvec, n=self.type.n + self.type.signed, m=self.type.m, signed=self.type.signed)
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
             raise Exception("Fractional extend produced incorrect value")
@@ -198,7 +199,7 @@ class FPExtendInt(FPOp):
     #Added by will
     def execute(self, args):
         value = FixedPoint(self.expr.execute(args))
-        new_value = FixedPoint( value, n=self.type.n + self.nbits, m=self.type.m, signed=self.type.signed)
+        new_value = FixedPoint( value, n=self.type.n + self.nbits + int(self.type.signed), m=self.type.m, signed=self.type.signed)
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
             raise Exception("Fractional extend produced incorrect value")
@@ -218,7 +219,7 @@ class FPTruncInt(FPOp):
     #Added by will
     def execute(self, args):
         value = FixedPoint(self.expr.execute(args))
-        new_value = FixedPoint( value, n=self.type.n - self.nbits, m=self.type.m, signed=self.type.signed)
+        new_value = FixedPoint( value, n=self.type.n - self.nbits + int(self.type.signed), m=self.type.m, signed=self.type.signed)
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
             raise Exception("Fractional extend produced incorrect value")
@@ -243,7 +244,7 @@ class FPToSigned(FPOp):
  
     def execute(self,args):
         value = self.expr.execute(args)
-        new_value = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=self.type.signed)
+        new_value = FixedPoint(float(value),n=self.type.n + 1, m=self.type.m, signed=True)
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
             raise Exception("Sign extend produced incorrect value")
@@ -267,7 +268,7 @@ class FPToUnsigned(FPOp): #FP Operation,
  
     def execute(self,args):
         value = self.expr.execute(args)
-        new_value = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=self.type.signed)
+        new_value = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=False)
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.expr.type.to_real(new_value)) > 1e-6:
             raise Exception("Sign extend produced incorrect value")
