@@ -31,6 +31,25 @@ def validate_model(blk,timestep,figname):
     plt.savefig(figname)
     plt.clf()
 
+
+def validate_pymtl_model(rtlblk,timestep,figname):
+    print(rtlblk)
+    outs = []
+    ts = []
+    cycles_per_sec = round(1/timestep)
+    max_cycles = 30*cycles_per_sec
+    for t in range(max_cycles):
+        values = rtlblk.pymtl_sim_tick({"w":1})
+        ts.append(t*timestep)
+        outi = values["out"]
+        outs.append(outi)
+
+    ts.append(max_cycles*timestep)
+
+    plt.plot(ts,outs)
+    plt.savefig(figname)
+    plt.clf()
+
 rel_prec=0.0001
 timestep=1e-2
 block = vco.make_vco(timestep=timestep,rel_prec=rel_prec)
@@ -59,4 +78,7 @@ validate_model(int_block, timestep, "int_dynamics.png")
 
 rtl_block = rtllib.RTLBlock(int_block)
 
-rtl_block.print_verilog_src()
+rtl_block.generate_verilog_src("./core/")
+rtl_block.generate_pymtl_wrapper()
+rtl_block.pymtl_sim_begin()
+validate_pymtl_model(rtl_block,timestep,"rtl_dynamics.png")
