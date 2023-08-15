@@ -5,6 +5,7 @@ import core.intervals as intervallib
 import core.block as blocklib
 import matplotlib.pyplot as plt
 import core.rtl as rtllib
+from pymtl3 import *
 
 def validate_model(blk,timestep,figname):
     print(blk)
@@ -39,16 +40,17 @@ def validate_pymtl_model(rtlblk,timestep,figname):
     cycles_per_sec = round(1/timestep)
     max_cycles = 30*cycles_per_sec
     for t in range(max_cycles):
-        values = rtlblk.pymtl_sim_tick({"w":1})
+        values = rtlblk.pymtl_sim_tick({"w":Bits(rtlblk.block.get_var('w').type.nbits, v=rtlblk.scale_value_to_int(0.75,rtlblk.block.get_var('w').type))})
         ts.append(t*timestep)
         outi = values["out"]
         outs.append(outi)
 
-    ts.append(max_cycles*timestep)
+   
 
     plt.plot(ts,outs)
-    plt.savefig(figname)
-    plt.clf()
+    plt.show()
+    #plt.savefig(figname)
+    #plt.clf()
 
 rel_prec=0.0001
 timestep=1e-2

@@ -9,6 +9,7 @@ from pymtl3.passes.backends.verilog import *
 from types import FunctionType
 from dill.source import getsource
 from pymtl3.stdlib.test_utils import mk_test_case_table, run_sim, config_model_with_cmdline_opts
+import math
 
 class RTLBlock:
 
@@ -48,11 +49,18 @@ class RTLBlock:
 
         self.seq = Seq(self.m, 'regassn', self.inputs['eval_clk'], self.inputs['reset'])
 
+
         for r in block.relations():
             if r.lhs.name in self.regs.keys():
-                self.seq(self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0]))
+                self.seq.If(self.inputs['reset'])(
+                    self.regs[r.lhs.name](self.scale_value_to_int(0.95, r.rhs.type)) #Kludge, needs to be changeable
+                ).Else(
+                    self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+                )
             elif r.lhs.name in self.wires.keys():
                 self.wires[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
+            elif r.lhs.name in self.outputs.keys():
+                self.outputs[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
     
     def print_verilog_src(self):
         v = self.m.to_verilog()
@@ -65,7 +73,8 @@ class RTLBlock:
         if not isinstance(type, IntType):
             print(type)
             raise Exception('wrong type')
-        return round(value / type.scale)
+        print(math.trunc(value / type.scale))
+        return math.trunc(value / type.scale)
 
 
     #This function pretty much traverses our expression tree and turns it into a veriloggen expression tree
@@ -136,7 +145,12 @@ class RTLBlock:
     
     def pymtl_sim_begin(self):
         dut = self.pymtl_object_class()
-        cmdline_opts = {}
+        cmdline_opts = {'dump_textwave'      : False,
+                                  'dump_vcd'           : self.name,
+                                  'test_verilog'       : False,
+                                  'test_yosys_verilog' : False,
+                                  'max_cycles'         : None,
+                                  'dump_vtb'           : ''}
         self.dut = config_model_with_cmdline_opts(dut, cmdline_opts, duts =[])
         self.dut.apply( DefaultPassGroup(linetrace=False))
         self.dut.sim_reset()
@@ -147,14 +161,12 @@ class RTLBlock:
 
         for v in self.block.vars():
             if v.kind == VarKind.Input:
-                print(v.name)
-                print(type(self.dut.w))
-                srcstring  = 'self.dut.' + v.name + ' @= ' + 'inputs[\'{}\']'.format(v.name)
+                srcstring  = '\nself.dut.' + v.name + ' @= ' + 'inputs[\'{}\']'.format(v.name) + '\n'
                 #srcstring = 'print(self.dut.w)'
                 #srcstring = 'print(inputs[\'{}\'])'.format(v.name)
                 #print(srcstring)
                 #print(srcstring)
-                srcex = compile(srcstring, '<String>', 'eval')
+                srcex = compile(srcstring, '<String>', 'exec') #was 'eval' insted of 'exec'
                 exec(srcex)
             if v.kind == VarKind.Output:
                 returndict[v.name] = getattr(self.dut, v.name)
