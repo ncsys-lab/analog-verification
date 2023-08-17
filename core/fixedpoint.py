@@ -98,7 +98,7 @@ def type_match(e,t):
     # risky will addition
     if e.type.integer != t.integer:
         if(e.type.integer < t.integer):
-            nbits = t.integer
+            nbits = t.integer - e.type.integer
             return type_match(FPExtendInt(nbits = nbits, expr = e), t)
         else:
             nbits = e.type.integer - t.integer
@@ -113,7 +113,19 @@ def type_match(e,t):
     print('idkwyn')
     raise NotImplementedError
 
-    
+
+def expr_type_match(lhse, rhse):
+    type_int = max(rhse.type.integer, lhse.type.integer)
+    type_sign  = rhse.type.signed or lhse.type.signed
+    type_logscale = min(lhse.type.log_scale, rhse.type.log_scale)
+
+    result_type = FixedPointType.from_integer_scale(integer=type_int, signed=type_sign, log_scale=type_logscale)
+    lhse = type_match(lhse, result_type)
+    rhse = type_match(rhse, result_type)
+    return lhse, rhse
+
+
+
 def fixed_point_expr(reg,expr):
     def rec(e):
         new_e = fixed_point_expr(reg,e)
@@ -122,18 +134,23 @@ def fixed_point_expr(reg,expr):
 
 
     if isinstance(expr, exprlib.Product):
-        lhse =  rec(expr.lhs)
+        lhse = rec(expr.lhs)
         rhse = rec(expr.rhs)
-        rhse_tm = sign_match(rhse,signed=rhse.type.signed or lhse.type.signed)
-        lhse_tm = sign_match(lhse,signed=rhse.type.signed or lhse.type.signed)
+
+        lhse, rhse = expr_type_match(lhse, rhse)
         expr_type = reg.get_type(expr.ident)
         prod = exprlib.Product(lhse, rhse)
-        prod.type = FixedPointType.from_integer_scale(integer=rhse.type.integer+lhse.type.integer, \
+        prod.type = FixedPointType.from_integer_scale(integer=rhse.type.integer+lhse.type.integer + int(rhse.type.signed) + int(lhse.type.signed), \
                     log_scale=rhse.type.log_scale+lhse.type.log_scale, \
                     signed=expr_type.signed)
+        prod.lhs = type_match(prod.lhs, prod.type)
+        prod.rhs = type_match(prod.rhs, prod.type)
+        print(prod.type)
         print('e: {}'.format(prod))
         print('t: {}'.format(expr_type))
         prod_typematch = type_match(prod, expr_type)
+        print(expr_type, prod_typematch.type)
+        input()
         return prod_typematch
     
     if isinstance(expr, exprlib.Quotient): #added by will
@@ -186,8 +203,9 @@ def fixed_point_expr(reg,expr):
     elif isinstance(expr, exprlib.Negation):
         new_expr = rec(expr.expr)
         if not new_expr.type.signed:
-            neg_expr = exprlib.Negation(FPToSigned(new_expr)) 
-            neg_expr.expr.type = reg.get_type(expr.ident)
+            neg_expr = exprlib.Negation(FPToSigned(new_expr))
+            print(reg.get_type(expr.ident))
+
         else:
             neg_expr = exprlib.Negation(new_expr)
         neg_expr.type = reg.get_type(expr.ident)

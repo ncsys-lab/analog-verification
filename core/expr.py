@@ -205,6 +205,7 @@ class Constant(Expression):
     def execute(self,args):
         newv = self.type.from_real(self.value)
         self.type.typecheck_value(newv)
+        print(newv)
         return newv 
 
     def pretty_print(self):

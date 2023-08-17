@@ -41,6 +41,7 @@ class IntType(VarType):
                 and other.signed == self.signed
 
     def from_real(self,v):
+
         unsc = round(v/self.scale)
         v_tc = min(self.upper,max(self.lower,unsc))
         if(abs(self.to_real(v_tc) - v) > self.scale):
@@ -53,9 +54,14 @@ class IntType(VarType):
 
     def typecast_value(self,v):
         # always take the top K bits
+        print("bits: {} scale: {}".format(self.nbits,self.scale))
+        print("typecasting {} @ ({},{}),".format(v, self.lower, self.upper))
         int_bits = IntType.nbits_int(v)
         v_tc = min(self.upper,max(self.lower,v))
+        print("v_tc: {}".format(v_tc))
+        print(abs(v_tc - v) > 2**(-self.nbits))
         if(abs(v_tc - v) > 2**(-self.nbits)):
+            print("how is this true")
             raise Exception("typecast %f => %f" % (v, self.to_real(v_tc)))
 
         return v_tc
@@ -86,10 +92,10 @@ class ToSInt(IntOp):
     @property
     def type(self):
         typ = self.expr.type
-        return IntType(nbits=typ.nbits, scale=typ.scale, signed=True)
+        return IntType(nbits=typ.nbits + 1, scale=typ.scale, signed=True)
 
     def pretty_print(self):
-        return "sint(%s)" % (self.expr.pretty_print())
+        return "toSint(%s)" % (self.expr.pretty_print())
 
     def execute(self,args):
         val = self.expr.execute(args)
@@ -104,7 +110,7 @@ class ToUSInt(IntOp):
     @property
     def type(self):
         typ = self.expr.type
-        return IntType(nbits=typ.nbits, scale=typ.scale, signed=False)
+        return IntType(nbits=typ.nbits - 1, scale=typ.scale, signed=False)
 
 
     def pretty_print(self):
@@ -112,6 +118,7 @@ class ToUSInt(IntOp):
 
     def execute(self,args):
         val = self.expr.execute(args)
+        val = abs(val)
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
@@ -134,7 +141,11 @@ class TruncR(IntOp):
         return "truncr(%s,%s)" % (self.expr.pretty_print(), self.nbits)
 
     def execute(self,args):
-        val = self.expr.execute(args)>>self.nbits
+        
+        val = self.expr.execute(args) // (2**self.nbits)
+        print(self.pretty_print())
+        print(val)
+        #input()
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
@@ -158,7 +169,7 @@ class PadR(IntOp):
         return "padr(%s,%s,%d)" % (self.expr.pretty_print(), self.nbits, self.value)
 
     def execute(self,args):
-        val = self.expr.execute(args) << self.nbits
+        val = self.expr.execute(args) * 2**self.nbits
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
@@ -186,6 +197,7 @@ class PadL(IntOp):
     def pretty_print(self):
         return "padl(%s,%s,%d)" % (self.expr.pretty_print(), self.nbits, self.value)
 
+
 @dataclass
 class TruncVal(IntOp): #Will
     nbits : int 
@@ -198,7 +210,7 @@ class TruncVal(IntOp): #Will
         return IntType(nbits = typ.nbits - self.nbits, scale=typ.scale, signed = typ.signed)
 
     def execute(self,args):
-        val = self.expr.execute(args)>>self.nbits
+        val = self.expr.execute(args) // 2**self.nbits
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc

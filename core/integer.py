@@ -65,6 +65,7 @@ def fpexpr_to_intexpr(blk,expr):
     elif isinstance(expr, exprlib.Product):
         nlhs = rec(expr.lhs)
         nrhs = rec(expr.rhs)
+        #nlhs and nrhs really need to be the same n_bits
         nexpr = exprlib.Product(nlhs,nrhs)
         nexpr.type = IntType.from_fixed_point_type(expr.type)
         print("type_result Prod: {}".format(nexpr.type))

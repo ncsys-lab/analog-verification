@@ -52,10 +52,15 @@ class RTLBlock:
 
         for r in block.relations():
             if r.lhs.name in self.regs.keys():
+                if(isinstance(r,Accumulate)):
+                    expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
+                else:
+                    expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+
                 self.seq.If(self.inputs['reset'])(
                     self.regs[r.lhs.name](self.scale_value_to_int(0.95, r.rhs.type)) #Kludge, needs to be changeable
                 ).Else(
-                    self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+                    expression
                 )
             elif r.lhs.name in self.wires.keys():
                 self.wires[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
@@ -83,7 +88,12 @@ class RTLBlock:
         if(isinstance(relation, Constant)):
             print('type')
             print(relation.value)
-            return self.scale_value_to_int(relation.value, relation.type), relation.type.nbits
+            print(relation.op_name)
+            print(relation.type)
+            const_wire = relation.op_name + "_" + str(next(self.namecounter))
+            self.wires[const_wire] = self.m.Wire(const_wire, relation.type.nbits)
+            self.wires[const_wire].assign(self.scale_value_to_int(relation.value, relation.type))
+            return self.wires[const_wire], relation.type.nbits
         elif(isinstance(relation, Var)):
             if(relation.name in self.regs.keys()):
                 print('type')
@@ -106,35 +116,94 @@ class RTLBlock:
             return self.traverse_expr_tree(relation.lhs)[0] - self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, Product)):
             return self.traverse_expr_tree(relation.lhs)[0] * self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
-        elif(isinstance(relation, Negation)):
+        elif(isinstance(relation, Negation)): #disgusting
             print(relation)
-            return - (self.traverse_expr_tree(relation.expr)[0]), relation.type.nbits
+            if(relation.expr.type.signed == True):
+                imm_wire_debug_name = relation.op_name + "_imm_" + str(next(self.namecounter))
+                self.wires[imm_wire_debug_name] = self.m.Wire(imm_wire_debug_name, relation.type.nbits)
+                self.wires[imm_wire_debug_name].assign(- (self.traverse_expr_tree(relation.expr)[0]))
+                return self.wires[imm_wire_debug_name], relation.type.nbits
+            else:
+                wire_name = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
+                
+                var = self.traverse_expr_tree(relation.expr)
+                self.wires[wire_name].assign(var[0])
+
+                wire_name_two = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name_two] = self.m.Wire(wire_name_two, 1)
+                self.wires[wire_name_two](0)
+
+                
+                return - Cat( self.wires[wire_name_two], self.wires[wire_name]), relation.type.nbits + 1
         elif(isinstance(relation, Quotient)):
             return self.traverse_expr_tree(relation.lhs)[0] / self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, TruncR)):
             #You can't truncate epressions, only wires in verilog, so you need to create an intermediate wire
-            wire_name = relation.op_name + "_" + str(next(self.namecounter))
-            self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
-            self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-            return (self.wires[wire_name][relation.nbits:]), relation.type.nbits
+            
+            if(False): #kludge
+                sext_name = 'sextOp' + '_' + str(next(self.namecounter))
+                print(relation.expr)
+                self.wires[sext_name] = self.m.Wire( sext_name, relation.expr.type.nbits)
+                self.wires[sext_name].assign(self.traverse_expr_tree(relation.expr)[0])
+
+
+                wire_name = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
+                self.wires[wire_name].assign(Cat( Repeat(self.wires[sext_name][relation.type.nbits],relation.type.nbits), self.wires[sext_name]))
+            else:
+                wire_name = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
+                self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
+
+            
+
+            return (self.wires[wire_name][relation.expr.type.nbits - relation.type.nbits:]), relation.type.nbits
         elif(isinstance(relation, ToUSInt)):
             
-            if(relation.type.signed):
+            if(not relation.expr.type.signed):
+                raise Exception("This should not be called on unsigned types")
                 retval = self.traverse_expr_tree(relation.expr)[0]
             else:
                 retval = self.traverse_expr_tree(relation.expr)[0][relation.type.nbits - 1:]
             return retval, relation.type.nbits
+        elif(isinstance(relation, ToSInt)):
+            if(relation.expr.type.signed):
+                raise Exception("This should not be called on unsigned type")
+            else:
+                wire_name_two = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name_two] = self.m.Wire(wire_name_two, 1)
+                self.wires[wire_name_two].assign(0)
+
+                imm_wire_debug_name = relation.op_name + "_imm_" + str(next(self.namecounter))
+                self.wires[imm_wire_debug_name] = self.m.Wire(imm_wire_debug_name, relation.type.nbits)
+                self.wires[imm_wire_debug_name].assign(Cat(self.wires[wire_name_two], self.traverse_expr_tree(relation.expr)[0]))
+
+                return self.wires[imm_wire_debug_name], relation.type.nbits
+
         elif(isinstance(relation, TruncVal)):
             wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
             self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-            return (self.wires[wire_name][relation.nbits:]), relation.type.nbits
+            return (self.wires[wire_name][relation.type.nbits:]), relation.type.nbits
         elif(isinstance(relation, PadR)):
-            raise NotImplementedError
+            padr_wire_name = relation.op_name + "_" + str(next(self.namecounter))
+            self.wires[padr_wire_name] = self.m.Wire(padr_wire_name, relation.type.nbits)
+
+            bits_wire_name = relation.op_name + "_bits_" + str(next(self.namecounter))
+            self.wires[bits_wire_name] = self.m.Wire(bits_wire_name, relation.nbits)
+
+            self.wires[bits_wire_name].assign(0)
+
+            self.wires[padr_wire_name].assign(Cat( self.traverse_expr_tree(relation.expr)[0], self.wires[bits_wire_name]))
+
+            return self.wires[padr_wire_name], relation.type.nbits
         
         else:
             print("ERROR, {} IS NOT IMPLEMENTED!!!".format(relation))
             raise NotImplementedError
+        
+    
         
         
     def generate_pymtl_wrapper(self):
@@ -169,7 +238,8 @@ class RTLBlock:
                 srcex = compile(srcstring, '<String>', 'exec') #was 'eval' insted of 'exec'
                 exec(srcex)
             if v.kind == VarKind.Output:
-                returndict[v.name] = getattr(self.dut, v.name)
+                returndict[v.name] = getattr(self.dut, v.name).int()
+                
         
         self.dut.sim_tick()
 
