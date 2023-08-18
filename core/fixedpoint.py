@@ -73,7 +73,7 @@ def sign_match(e,signed):
 # make 
 def type_match(e,t):
     
-    print(e.type,t)
+
     if e.type.match(t):
         return e
 
@@ -126,6 +126,8 @@ def expr_type_match(lhse, rhse):
 
 
 
+    
+
 def fixed_point_expr(reg,expr):
     def rec(e):
         new_e = fixed_point_expr(reg,e)
@@ -140,18 +142,21 @@ def fixed_point_expr(reg,expr):
         lhse, rhse = expr_type_match(lhse, rhse)
         expr_type = reg.get_type(expr.ident)
         prod = exprlib.Product(lhse, rhse)
+        
+        
         prod.type = FixedPointType.from_integer_scale(integer=rhse.type.integer+lhse.type.integer + int(rhse.type.signed) + int(lhse.type.signed), \
                     log_scale=rhse.type.log_scale+lhse.type.log_scale, \
                     signed=expr_type.signed)
-        prod.lhs = type_match(prod.lhs, prod.type)
-        prod.rhs = type_match(prod.rhs, prod.type)
+        print(prod.lhs.type)
+        print(prod.rhs.type)
         print(prod.type)
+
+        prod = type_match(prod,expr_type)
         print('e: {}'.format(prod))
         print('t: {}'.format(expr_type))
-        prod_typematch = type_match(prod, expr_type)
-        print(expr_type, prod_typematch.type)
-        input()
-        return prod_typematch
+
+
+        return prod
     
     if isinstance(expr, exprlib.Quotient): #added by will
         lhse =  rec(expr.lhs)

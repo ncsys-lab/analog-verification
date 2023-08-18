@@ -39,6 +39,20 @@ def typecheck_int_type(node,intt,fpt):
     if not intt.matches(infer_intt):
         raise Exception("mismatch %s: int-type=%s | fp-type=%s (scale=%f) int-type=%s" \
                     % (node.op_name, intt,fpt,fpt.scale, infer_intt))
+    
+def mult_type_match(e,t):
+    print(e.type,t)
+
+    if e.type.nbits == t.nbits:
+        return e
+    else:
+        if(e.type.nbits < t.nbits):
+            nbits = t.nbits - e.type.nbits
+            return mult_type_match(PadL(nbits = nbits, expr = e, value=0), t)
+        else:
+            nbits = e.type.nbits - t.nbits
+            return mult_type_match(TruncVal(nbits = nbits, expr = e,value=0), t)
+        
 
 def fpexpr_to_intexpr(blk,expr):
     print(expr)
@@ -66,9 +80,15 @@ def fpexpr_to_intexpr(blk,expr):
         nlhs = rec(expr.lhs)
         nrhs = rec(expr.rhs)
         #nlhs and nrhs really need to be the same n_bits
+
         nexpr = exprlib.Product(nlhs,nrhs)
         nexpr.type = IntType.from_fixed_point_type(expr.type)
+        nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
+        nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
         print("type_result Prod: {}".format(nexpr.type))
+        print(nexpr.lhs)
+        print(nexpr.rhs)
+        input()
         return nexpr
 
     elif isinstance(expr, exprlib.Difference):

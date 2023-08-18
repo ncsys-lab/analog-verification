@@ -13,7 +13,7 @@ import math
 
 class RTLBlock:
 
-    def __init__(self, block):
+    def __init__(self, block, initconditions):
 
         self.block = block
 
@@ -27,6 +27,7 @@ class RTLBlock:
         self.outputs = {}
 
         self.params  = {}
+        self.initconditions = initconditions
 
         self.inputs['clk'] = self.m.Input('sys_clk')#kludge for pymtl sim to be on eval_clk
         self.inputs['eval_clk'] = self.m.Input('clk')#
@@ -51,6 +52,7 @@ class RTLBlock:
 
 
         for r in block.relations():
+            print("executing for relation: {}".format(r.rhs.pretty_print()))
             if r.lhs.name in self.regs.keys():
                 if(isinstance(r,Accumulate)):
                     expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
@@ -58,7 +60,7 @@ class RTLBlock:
                     expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
 
                 self.seq.If(self.inputs['reset'])(
-                    self.regs[r.lhs.name](self.scale_value_to_int(0.95, r.rhs.type)) #Kludge, needs to be changeable
+                    self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type)) #Kludge, needs to be changeable
                 ).Else(
                     expression
                 )
@@ -185,7 +187,7 @@ class RTLBlock:
             wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
             self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-            return (self.wires[wire_name][relation.type.nbits:]), relation.type.nbits
+            return (self.wires[wire_name][relation.nbits:]), relation.type.nbits
         elif(isinstance(relation, PadR)):
             padr_wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[padr_wire_name] = self.m.Wire(padr_wire_name, relation.type.nbits)
@@ -196,6 +198,25 @@ class RTLBlock:
             self.wires[bits_wire_name].assign(0)
 
             self.wires[padr_wire_name].assign(Cat( self.traverse_expr_tree(relation.expr)[0], self.wires[bits_wire_name]))
+
+            return self.wires[padr_wire_name], relation.type.nbits
+        
+        elif(isinstance(relation, PadL)):
+            padr_wire_name = relation.op_name + "_" + str(next(self.namecounter))
+            self.wires[padr_wire_name] = self.m.Wire(padr_wire_name, relation.type.nbits)
+
+            bits_wire_name = relation.op_name + "_bits_" + str(next(self.namecounter))
+            self.wires[bits_wire_name] = self.m.Wire(bits_wire_name, relation.expr.type.nbits)
+
+            self.wires[bits_wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
+            
+            if(relation.expr.type.signed):
+                self.wires[padr_wire_name].assign(Cat(Repeat(self.wires[bits_wire_name][relation.expr.type.nbits - 1],relation.nbits), self.wires[bits_wire_name]))
+            else:
+                zero_wire_name = relation.op_name + "_bits_zero_" + str(next(self.namecounter))
+                self.wires[zero_wire_name] = self.m.Wire(zero_wire_name, relation.nbits)
+                self.wires[zero_wire_name].assign(0)
+                self.wires[padr_wire_name].assign(Cat(self.wires[zero_wire_name], self.wires[bits_wire_name]))
 
             return self.wires[padr_wire_name], relation.type.nbits
         
@@ -239,6 +260,7 @@ class RTLBlock:
                 exec(srcex)
             if v.kind == VarKind.Output:
                 returndict[v.name] = getattr(self.dut, v.name).int()
+                print(returndict[v.name])
                 
         
         self.dut.sim_tick()

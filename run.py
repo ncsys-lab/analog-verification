@@ -43,7 +43,7 @@ def validate_pymtl_model(rtlblk,timestep,figname):
     cycles_per_sec = round(1/timestep)
     max_cycles = 30*cycles_per_sec
     for t in range(max_cycles):
-        values = rtlblk.pymtl_sim_tick({"w":Bits(rtlblk.block.get_var('w').type.nbits, v=rtlblk.scale_value_to_int(0.75,rtlblk.block.get_var('w').type))})
+        values = rtlblk.pymtl_sim_tick({"w":Bits(rtlblk.block.get_var('w').type.nbits, v=rtlblk.scale_value_to_int(0.999,rtlblk.block.get_var('w').type))})
         ts.append(t*timestep)
         outi = values["out"]
         outs.append(outi)
@@ -89,9 +89,10 @@ validate_model(int_block, timestep, "int_dynamics.png")
 for i in int_block.relations():
     print(i)
   
-rtl_block = rtllib.RTLBlock(int_block)
+rtl_block = rtllib.RTLBlock(int_block, {'x':0.79, 'v':0.00})
 
 rtl_block.generate_verilog_src("./core/")
 rtl_block.generate_pymtl_wrapper()
 rtl_block.pymtl_sim_begin()
 validate_pymtl_model(rtl_block,timestep,"rtl_dynamics.png")
+

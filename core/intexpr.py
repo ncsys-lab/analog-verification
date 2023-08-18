@@ -101,6 +101,7 @@ class ToSInt(IntOp):
         val = self.expr.execute(args)
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
+        print('in tosint')
         return val_tc
     
 @dataclass
@@ -211,6 +212,7 @@ class TruncVal(IntOp): #Will
 
     def execute(self,args):
         val = self.expr.execute(args) // 2**self.nbits
+        print('in_truncval')
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
