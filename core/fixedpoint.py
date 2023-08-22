@@ -82,6 +82,16 @@ def type_match(e,t):
     
     if e.type.signed and not t.signed:
         return type_match(FPToUnsigned(expr=e),t)
+    
+    # risky will addition
+    if e.type.integer != t.integer:
+        if(e.type.integer < t.integer):
+            nbits = t.integer - e.type.integer
+            return type_match(FPExtendInt(nbits = nbits, expr = e), t)
+        else:
+            nbits = e.type.integer - t.integer
+            return type_match(FPTruncInt(nbits = nbits, expr = e), t)
+
 
     if e.type.fractional < t.fractional:
         return type_match(FPExtendFrac(expr=e,nbits=t.fractional - e.type.fractional), t)
@@ -93,16 +103,6 @@ def type_match(e,t):
         else:
             rem_trunc = nbits_trunc - e.type.fractional
             return type_match(FPTruncInt(FPTruncFrac(expr=e, nbits=e.type.fractional), nbits=rem_trunc), t)
-
-
-    # risky will addition
-    if e.type.integer != t.integer:
-        if(e.type.integer < t.integer):
-            nbits = t.integer - e.type.integer
-            return type_match(FPExtendInt(nbits = nbits, expr = e), t)
-        else:
-            nbits = e.type.integer - t.integer
-            return type_match(FPTruncInt(nbits = nbits, expr = e), t)
 
     if e.type.scale != t.scale:
         raise NotImplementedError
@@ -124,6 +124,9 @@ def expr_type_match(lhse, rhse):
     rhse = type_match(rhse, result_type)
     return lhse, rhse
 
+
+def mult_type_match(e, t):
+    return FPTruncL(expr=e, nbits= e.type.nbits - t.nbits)
 
 
     
@@ -147,14 +150,8 @@ def fixed_point_expr(reg,expr):
         prod.type = FixedPointType.from_integer_scale(integer=rhse.type.integer+lhse.type.integer + int(rhse.type.signed) + int(lhse.type.signed), \
                     log_scale=rhse.type.log_scale+lhse.type.log_scale, \
                     signed=expr_type.signed)
-        print(prod.lhs.type)
-        print(prod.rhs.type)
-        print(prod.type)
-
+        
         prod = type_match(prod,expr_type)
-        print('e: {}'.format(prod))
-        print('t: {}'.format(expr_type))
-
 
         return prod
     
@@ -168,18 +165,13 @@ def fixed_point_expr(reg,expr):
         prod.type = FixedPointType.from_integer_scale(integer=lhse.type.integer - rhse.type.integer, \
                     log_scale=lhse.type.log_scale - rhse.type.log_scale, \
                     signed=expr_type.signed)
-        print('e: {}'.format(prod))
-        print('t: {}'.format(expr_type))
-        prod_typematch = type_match(prod, expr_type)
+
+        prod_typematch = type_match_mult(prod, expr_type)
         return prod_typematch
 
     elif isinstance(expr, exprlib.Sum): #improved by will
         lhse = rec(expr.lhs)
         rhse = rec(expr.rhs)
-        print(lhse)
-        print(rhse)
-
-        print("entering type_relax")
         targ_type = type_relax(lhse.type, rhse.type)
         lhse_tm = type_match(lhse,targ_type)
         rhse_tm = type_match(rhse,targ_type)
@@ -190,10 +182,7 @@ def fixed_point_expr(reg,expr):
     elif isinstance(expr, exprlib.Difference): #improved by will
         lhse = rec(expr.lhs)
         rhse = rec(expr.rhs)
-        print(lhse)
-        print(rhse)
 
-        print("entering type_relax")
         targ_type = type_relax(lhse.type, rhse.type)
         lhse_tm = type_match(lhse,targ_type)
         rhse_tm = type_match(rhse,targ_type)
@@ -209,7 +198,7 @@ def fixed_point_expr(reg,expr):
         new_expr = rec(expr.expr)
         if not new_expr.type.signed:
             neg_expr = exprlib.Negation(FPToSigned(new_expr))
-            print(reg.get_type(expr.ident))
+
 
         else:
             neg_expr = exprlib.Negation(new_expr)
@@ -255,7 +244,7 @@ def fixed_point_block(reg,block):
 
     for p in block.params():
         typ = fixed_point_var(reg,p)
-        print(typ)
+
         fp_block.decl_param(name=p.name, value=p.constant)
         fp_block._params[p.name].constant.type = typ
         fp_block._params[p.name].type = typ

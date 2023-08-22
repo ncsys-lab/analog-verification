@@ -26,6 +26,7 @@ def validate_model(blk,timestep,figname):
 
 
 
+    print(len(vs))
     xs.append(xi)
     vs.append(vi)
     ts.append(max_cycles*timestep)
@@ -63,7 +64,7 @@ print("------ Real-valued AMS Block -----")
 print(block)
 print("\n")
 input("press any key to run simulation..")
-#validate_model(block, timestep, "orig_dynamics.png")
+validate_model(block, timestep, "orig_dynamics.png")
 
 print(block.relations())
 
@@ -73,10 +74,13 @@ print("------ Fixed Point AMS Block -----")
 print(fp_block)
 print("\n")
 input("press any key to run simulation..")
-#validate_model(fp_block, timestep, "fp_dynamics.png")
+validate_model(fp_block, timestep, "fp_dynamics.png")
 
 print(fp_block.vars())
+for i in fp_block.relations():
+    print(i.pretty_print())
 
+#raise Exception
 
 
 int_block = intlib.to_integer(fp_block)
@@ -87,7 +91,9 @@ input("press any key to run simulation..")
 validate_model(int_block, timestep, "int_dynamics.png")
 
 for i in int_block.relations():
-    print(i)
+    print(i.pretty_print())
+
+
   
 rtl_block = rtllib.RTLBlock(int_block, {'x':0.79, 'v':0.00})
 
@@ -95,4 +101,3 @@ rtl_block.generate_verilog_src("./core/")
 rtl_block.generate_pymtl_wrapper()
 rtl_block.pymtl_sim_begin()
 validate_pymtl_model(rtl_block,timestep,"rtl_dynamics.png")
-

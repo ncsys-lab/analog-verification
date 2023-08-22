@@ -10,7 +10,7 @@ def make_vco(timestep=1e-3,rel_prec=0.001):
     #w = vco.decl_input(Real("w"))
     #out = vco.decl_output(Real("out"))
 
-    w = vco.decl_var("w", kind=VarKind.Input, type=RealType(lower=0,upper=1,prec=rel_prec*1.0))
+    w = vco.decl_var("w", kind=VarKind.Input, type=RealType(lower=0.5,upper=1,prec=rel_prec*0.10)) #total kludge to get the product lower above 0.00
     x = vco.decl_var("x", kind=VarKind.StateVar, type=RealType(lower=-1,upper=1,prec=rel_prec*2.0))
     v = vco.decl_var("v", kind=VarKind.StateVar, type=RealType(lower=-1,upper=1,prec=rel_prec*2.0)) 
     out = vco.decl_var("out", kind=VarKind.Output, type=x.type)

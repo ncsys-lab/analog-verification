@@ -48,7 +48,7 @@ module vco_fp_int
   assign padl_bits_15 = padr_16;
   assign padl_14 = { { 16{ padl_bits_15[14] } }, padl_bits_15 };
   assign truncval_1 = padl_2 * padl_14;
-  assign truncR_0 = truncval_1[28:0];
+  assign truncR_0 = truncval_1[30:2];
   assign dvdt = truncR_0[28:14];
   assign dxdt = v;
   assign out = x;
@@ -74,7 +74,7 @@ module vco_fp_int
   assign padl_bits_27 = padr_28;
   assign padl_26 = { { 22{ padl_bits_27[20] } }, padl_bits_27 };
   assign truncval_20 = padl_21 * padl_26;
-  assign truncR_19 = truncval_20[40:0];
+  assign truncR_19 = truncval_20[42:2];
   assign truncR_18 = truncR_19[40:20];
   wire [20-1:0] truncR_30;
   wire [41-1:0] truncR_31;
@@ -98,7 +98,7 @@ module vco_fp_int
   assign padl_bits_39 = padr_40;
   assign padl_38 = { { 22{ padl_bits_39[20] } }, padl_bits_39 };
   assign truncval_32 = padl_33 * padl_38;
-  assign truncR_31 = truncval_32[40:0];
+  assign truncR_31 = truncval_32[42:2];
   assign truncR_30 = truncR_31[40:21];
 
   always @(posedge clk) begin

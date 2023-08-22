@@ -88,7 +88,6 @@ def fpexpr_to_intexpr(blk,expr):
         print("type_result Prod: {}".format(nexpr.type))
         print(nexpr.lhs)
         print(nexpr.rhs)
-        input()
         return nexpr
 
     elif isinstance(expr, exprlib.Difference):
@@ -177,8 +176,16 @@ def fpexpr_to_intexpr(blk,expr):
     
     elif isinstance(expr, fpexprlib.FPTruncInt):
         eexpr = rec(expr.expr)
-        exint = TruncVal(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits,value=0)
+        exint = TruncVal(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
         print("type_result TruncInt: {}".format(exint.type))
+        typecheck_int_type(exint, exint.type, expr.type)
+        
+        return exint
+    
+    elif isinstance(expr, fpexprlib.FPTruncL):
+        eexpr = rec(expr.expr)
+        exint = TruncL(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
+        print("type_result TruncL: {}".format(exint.type))
         typecheck_int_type(exint, exint.type, expr.type)
         
         return exint

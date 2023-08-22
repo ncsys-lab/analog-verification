@@ -60,7 +60,7 @@ class RTLBlock:
                     expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
 
                 self.seq.If(self.inputs['reset'])(
-                    self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type)) #Kludge, needs to be changeable
+                    self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type)) 
                 ).Else(
                     expression
                 )
@@ -187,7 +187,7 @@ class RTLBlock:
             wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
             self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-            return (self.wires[wire_name][relation.nbits:]), relation.type.nbits
+            return (self.wires[wire_name][:relation.expr.type.nbits - relation.nbits]), relation.type.nbits
         elif(isinstance(relation, PadR)):
             padr_wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[padr_wire_name] = self.m.Wire(padr_wire_name, relation.type.nbits)

@@ -54,14 +54,13 @@ class IntType(VarType):
 
     def typecast_value(self,v):
         # always take the top K bits
-        print("bits: {} scale: {}".format(self.nbits,self.scale))
-        print("typecasting {} @ ({},{}),".format(v, self.lower, self.upper))
+
         int_bits = IntType.nbits_int(v)
         v_tc = min(self.upper,max(self.lower,v))
-        print("v_tc: {}".format(v_tc))
-        print(abs(v_tc - v) > 2**(-self.nbits))
+
+
         if(abs(v_tc - v) > 2**(-self.nbits)):
-            print("how is this true")
+
             raise Exception("typecast %f => %f" % (v, self.to_real(v_tc)))
 
         return v_tc
@@ -101,7 +100,7 @@ class ToSInt(IntOp):
         val = self.expr.execute(args)
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
-        print('in tosint')
+
         return val_tc
     
 @dataclass
@@ -144,8 +143,7 @@ class TruncR(IntOp):
     def execute(self,args):
         
         val = self.expr.execute(args) // (2**self.nbits)
-        print(self.pretty_print())
-        print(val)
+
         #input()
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
@@ -202,7 +200,6 @@ class PadL(IntOp):
 @dataclass
 class TruncVal(IntOp): #Will
     nbits : int 
-    value : int
     op_name : ClassVar[str]= 'truncval'
 
     @property
@@ -211,11 +208,32 @@ class TruncVal(IntOp): #Will
         return IntType(nbits = typ.nbits - self.nbits, scale=typ.scale, signed = typ.signed)
 
     def execute(self,args):
-        val = self.expr.execute(args) // 2**self.nbits
-        print('in_truncval')
+        val = self.expr.execute(args) #oh my gosh removing // 2**nbits fixed it
+
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
 
     def pretty_print(self):
-        return 'truncval(%s,%s,%da)' % (self.expr.pretty_print(), self.nbits, self.value)
+        return 'truncval(%s,%s)' % (self.expr.pretty_print(), self.nbits)
+    
+@dataclass
+class TruncL(IntOp):
+    nbits : int
+    op_name: ClassVar[str]= 'truncL'
+
+    #property
+    @property
+    def type(self):
+        typ = self.expr.type
+        return IntType(nbits = typ.nbits - self.nbits, scale=typ.scale, signed = typ.signed)
+    
+    def execute(self,args):
+        val = self.expr.execute(args)
+        val_tc = self.type.typecast_value(val)
+        self.type.typecheck_value(val_tc)
+        return val_tc
+    
+    def pretty_print(self):
+        return 'truncL(%s,%s)' % (self.expr.pretty_print(), self.nbits)
+
