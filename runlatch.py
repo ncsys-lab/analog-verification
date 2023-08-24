@@ -181,7 +181,7 @@ TICK_DIVISION = 100000
 SYSTEM_CLOCK = 1e-6
 
 
-initial_conditions = Initializer({'VREF': 1.60000001, 'VREG': 1.6, 'o': 3.3})
+initial_conditions = Initializer({'VREF': 2, 'VREG': 1.6, 'o': 3.3})
 
 comparator_latch_fsm = FSMAMSBlock(SYSTEM_CLOCK, TICK_DIVISION, initial_conditions)
 
@@ -242,7 +242,7 @@ fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_low_high.block)
 
 int_block = intlib.to_integer(fp_block)
 
-rtl_block = rtllib.RTLBlock(int_block)
+rtl_block = rtllib.RTLBlock(int_block,{'o':3.3})
 
 rtl_block.print_verilog_src()
 

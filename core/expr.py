@@ -241,6 +241,10 @@ class Sum(Expression):
     def variables(self) -> "Set[Real]":
         return self.lhs.variables | self.rhs.variables
     
+    def pretty_print(self):
+        return "{} + {}".format(self.lhs.pretty_print(), self.rhs.pretty_print())
+    
+    
     def execute(self, args):
         result = self.lhs.execute(args) + self.rhs.execute(args)
         tc_result = self.type.typecast_value(result)
@@ -254,11 +258,8 @@ class Difference(Expression):
     type  = None
     op_name : ClassVar[str]= "diff"
 
-
     def children(self):
         return [self.lhs, self.rhs]
-
-
 
     @property
     def sympy(self) -> sym.Expr:
@@ -267,6 +268,9 @@ class Difference(Expression):
     @property
     def variables(self) -> "Set[Real]":
         return self.lhs.variables | self.rhs.variables
+    
+    def pretty_print(self):
+        return "{} - {}".format(self.lhs.pretty_print(), self.rhs.pretty_print())
     
     def execute(self, args):
         result = self.lhs.execute(args) - self.rhs.execute(args)
@@ -346,6 +350,10 @@ class Quotient(Expression):
     @property
     def variables(self) -> "Set[Real]":
         return self.lhs.variables | self.rhs.variables
+    
+    def pretty_print(self):
+        return "({}) / ({})".format(self.lhs.pretty_print(), self.rhs.pretty_print())
+    
     
     def execute(self, args):
         result = self.lhs.execute(args) / self.rhs.execute(args)

@@ -17,15 +17,17 @@ def validate_model(blk,timestep,figname):
     max_cycles = 30*cycles_per_sec
     for t in range(max_cycles):
     
-        values = blocklib.execute_block(blk,{"w":0.5, "x": xi, "v": vi})
+        values = blocklib.execute_block(blk,{"w":0.999, "x": xi, "v": vi})
         ts.append(t*timestep)
         xs.append(xi)
         vs.append(vi)
+
+
+        
         xi = values["x"]
         vi = values["v"]
 
-
-
+    
     print(len(vs))
     xs.append(xi)
     vs.append(vi)
@@ -93,6 +95,9 @@ validate_model(int_block, timestep, "int_dynamics.png")
 for i in int_block.relations():
     print(i.pretty_print())
 
+for v in int_block.vars():
+    print(v)
+input()
 
   
 rtl_block = rtllib.RTLBlock(int_block, {'x':0.79, 'v':0.00})

@@ -166,7 +166,7 @@ def fixed_point_expr(reg,expr):
                     log_scale=lhse.type.log_scale - rhse.type.log_scale, \
                     signed=expr_type.signed)
 
-        prod_typematch = type_match_mult(prod, expr_type)
+        prod_typematch = type_match(prod, expr_type)
         return prod_typematch
 
     elif isinstance(expr, exprlib.Sum): #improved by will

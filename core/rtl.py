@@ -167,8 +167,12 @@ class RTLBlock:
                 raise Exception("This should not be called on unsigned types")
                 retval = self.traverse_expr_tree(relation.expr)[0]
             else:
-                retval = self.traverse_expr_tree(relation.expr)[0][relation.type.nbits - 1:]
-            return retval, relation.type.nbits
+                toUSint_wire = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[toUSint_wire] = self.m.Wire(toUSint_wire, relation.expr.type.nbits)
+                self.wires[toUSint_wire].assign(self.traverse_expr_tree(relation.expr)[0])
+
+            return self.wires[toUSint_wire][relation.type.nbits - 2:], relation.type.nbits
+        
         elif(isinstance(relation, ToSInt)):
             if(relation.expr.type.signed):
                 raise Exception("This should not be called on unsigned type")
