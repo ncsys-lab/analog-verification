@@ -41,7 +41,7 @@ def fixed_point_reprs(ival_reg):
 
 def type_relax(t1,t2):
     
-    print(t1, t2)
+    #print(t1, t2)
     if t1.match(t2):
         return t1
 
@@ -52,7 +52,7 @@ def type_relax(t1,t2):
         return FixedPointType.from_integer_scale(integer=integer, signed=sign, log_scale=t1.log_scale)
 
     elif t1.log_scale > 0 and t2.log_scale  > 0:
-        print(t1,t2)
+        #print(t1,t2)
         raise NotImplementedError
 
     elif t1.log_scale < 0 and t2.log_scale  < 0:
@@ -156,13 +156,14 @@ def fixed_point_expr(reg,expr):
         return prod
     
     if isinstance(expr, exprlib.Quotient): #added by will
-        lhse =  rec(expr.lhs)
+        lhse = rec(expr.lhs)
         rhse = rec(expr.rhs)
-        rhse_tm = sign_match(rhse,signed=rhse.type.signed or lhse.type.signed)
-        lhse_tm = sign_match(lhse,signed=rhse.type.signed or lhse.type.signed)
+        lhse, rhse = expr_type_match(lhse, rhse)
+
         expr_type = reg.get_type(expr.ident)
         prod = exprlib.Quotient(lhse, rhse)
-        prod.type = FixedPointType.from_integer_scale(integer=lhse.type.integer - rhse.type.integer, \
+
+        prod.type = FixedPointType.from_integer_scale(integer=lhse.type.integer - rhse.type.integer + int(lhse.type.signed), \
                     log_scale=lhse.type.log_scale - rhse.type.log_scale, \
                     signed=expr_type.signed)
 
@@ -251,7 +252,7 @@ def fixed_point_block(reg,block):
         
 
     for rel in block.relations():
-        print("stariting relation {}: {}".format(rel.ident, rel))
+        #print("stariting relation {}: {}".format(rel.ident, rel))
         if isinstance(rel,exprlib.VarAssign):
             eq_expr = fixed_point_expr(reg,rel)
             fp_block.decl_relation(eq_expr)

@@ -41,7 +41,7 @@ def typecheck_int_type(node,intt,fpt):
                     % (node.op_name, intt,fpt,fpt.scale, infer_intt))
     
 def mult_type_match(e,t):
-    print(e.type,t)
+    #print(e.type,t)
 
     if e.type.nbits == t.nbits:
         return e
@@ -55,15 +55,15 @@ def mult_type_match(e,t):
         
 
 def fpexpr_to_intexpr(blk,expr):
-    print(expr)
+    #print(expr)
     def rec(e):
-        print("entering recursion for op: {}".format(e.op_name))
+        #print("entering recursion for op: {}".format(e.op_name))
         return fpexpr_to_intexpr(blk,e)
 
     if isinstance(expr, exprlib.Var):
         newV = exprlib.Var(expr.name)
         newV.type = IntType.from_fixed_point_type(expr.type)
-        print("type_result Var: {}".format(newV.type))
+        #print("type_result Var: {}".format(newV.type))
         return newV
 
     elif isinstance(expr, exprlib.Constant):
@@ -85,9 +85,9 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr.type = IntType.from_fixed_point_type(expr.type)
         nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
         nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
-        print("type_result Prod: {}".format(nexpr.type))
-        print(nexpr.lhs)
-        print(nexpr.rhs)
+        #print("type_result Prod: {}".format(nexpr.type))
+        #print(nexpr.lhs)
+        #print(nexpr.rhs)
         return nexpr
 
     elif isinstance(expr, exprlib.Difference):
@@ -95,7 +95,7 @@ def fpexpr_to_intexpr(blk,expr):
         nrhs = rec(expr.rhs)
         nexpr = exprlib.Difference(nlhs,nrhs)
         nexpr.type = IntType.from_fixed_point_type(expr.type)
-        print("type_result Prod: {}".format(nexpr.type))
+        #print("type_result Prod: {}".format(nexpr.type))
         return nexpr
     
     elif isinstance(expr, exprlib.Quotient):
@@ -104,6 +104,9 @@ def fpexpr_to_intexpr(blk,expr):
 
         nexpr = exprlib.Quotient(nlhs, nrhs)
         nexpr.type = IntType.from_fixed_point_type(expr.type)
+        nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
+        nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
+        
         return nexpr
     
 
@@ -130,15 +133,15 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr = rec(expr.expr)
         truncF = TruncR(nexpr,nbits=expr.nbits)
         typecheck_int_type(truncF,truncF.type, expr.type)
-        print("type_result TruncF: {}".format(truncF.type))
+        #print("type_result TruncF: {}".format(truncF.type))
         return truncF
     
     elif isinstance(expr, fpexprlib.FPToUnsigned):#added by will
         nexpr = rec(expr.expr)
         usignF= ToUSInt(expr=nexpr)
-        print("type_result usignF: {}".format(usignF.type))
-        print(expr.type)
-        print("child expr:", expr.expr)
+        #print("type_result usignF: {}".format(usignF.type))
+        #print(expr.type)
+        #print("child expr:", expr.expr)
         typecheck_int_type(usignF,usignF.type, expr.type)
         return usignF
 
@@ -147,19 +150,19 @@ def fpexpr_to_intexpr(blk,expr):
         expr_rhs = rec(expr.rhs)
         sumop = exprlib.Sum(expr_lhs, expr_rhs)
         sumop.type = IntType.from_fixed_point_type(expr.type)
-        print("=== lhs ===")
-        print(expr.lhs)
-        print(expr.lhs.type)
-        print(expr_lhs.type)
+        #print("=== lhs ===")
+        #print(expr.lhs)
+        #print(expr.lhs.type)
+        #print(expr_lhs.type)
 
-        print("=== rhs ===")
-        print(expr.rhs)
-        print(expr.rhs.type)
-        print(expr_rhs.type)
+        #print("=== rhs ===")
+        #print(expr.rhs)
+        #print(expr.rhs.type)
+        #print(expr_rhs.type)
 
-        print('===expr===')
-        print(expr.type)
-        print(sumop.type)
+        #print('===expr===')
+        #print(expr.type)
+        #print(sumop.type)
         assert(expr_lhs.type.nbits == expr_rhs.type.nbits)
         typecheck_int_type(sumop,sumop.type, expr.type)
         return sumop
@@ -168,24 +171,24 @@ def fpexpr_to_intexpr(blk,expr):
         
         eexpr = rec(expr.expr)
         exint = PadL(expr=eexpr,nbits=expr.nbits,value=0)
-        print('===expr===')
-        print(eexpr.type)
-        print(exint.type)
+        #print('===expr===')
+        #print(eexpr.type)
+        #print(exint.type)
         typecheck_int_type(exint,exint.type,expr.type)
         return exint
     
     elif isinstance(expr, fpexprlib.FPTruncInt):
         eexpr = rec(expr.expr)
         exint = TruncVal(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
-        print("type_result TruncInt: {}".format(exint.type))
+        #print("type_result TruncInt: {}".format(exint.type))
         typecheck_int_type(exint, exint.type, expr.type)
         
         return exint
     
     elif isinstance(expr, fpexprlib.FPTruncL):
         eexpr = rec(expr.expr)
-        exint = TruncL(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
-        print("type_result TruncL: {}".format(exint.type))
+        exint = Trunc(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
+        #print("type_result TruncInt: {}".format(exint.type))
         typecheck_int_type(exint, exint.type, expr.type)
         
         return exint
@@ -227,7 +230,7 @@ def to_integer(fp_block):
     for p in fp_block.params():
         typ = IntType.from_fixed_point_type(p.type)
         int_blk.decl_param(name=p.name, value=p.constant)   
-        print(typ)
+        #print(typ)
         int_blk._params[p.name].constant.type = typ
         int_blk._params[p.name].type = typ
        

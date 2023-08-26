@@ -128,21 +128,3 @@ def execute_block(blk, args):
         else:
             raise Exception("not supported: %s" % rel)
     return vals
-
-def execute_block_int(blk, args):
-    vals = dict(args)
-    for rel in blk.relations():
-        if isinstance(rel, VarAssign):
-            #print(rel.rhs)
-            rhs_val = rel.rhs.execute(vals)
-            vals[rel.lhs.name] = rel.rhs.execute(vals)
-        elif isinstance(rel,Integrate):
-            rhs_val = rel.rhs.execute(vals)
-            vals[rel.lhs.name] += rel.rhs.execute(vals)
-        elif isinstance(rel,Accumulate):
-            rhs_val = rel.rhs.execute(vals)
-            vals[rel.lhs.name] += rel.rhs.execute(vals)
-
-        else:
-            raise Exception("not supported: %s" % rel)
-    return vals

@@ -2,11 +2,15 @@ from enum import Enum
 from core.block import *
 from core.expr import *
 from copy import *
+import core.fixedpoint as fixlib
+import core.rtl as rtllib
+import core.integer as intlib
+import core.intervals as intervallib
 
 class FSMAMSBlock:
 
     #In reality, evaluate_dt_division should be a factor of 2**n, othewise it becomes hairy to divide the clock.
-    def __init__(self, system_dt, evaluate_dt_division, initializer, starting_state = None):
+    def __init__(self, system_dt, evaluate_dt_division, initializer, name, starting_state = None):
         self.nodes = {}
         self.edges  = {}
         self.starting_state = starting_state
@@ -21,6 +25,18 @@ class FSMAMSBlock:
         self.state_vars = initializer.conditions
 
         self.event_this_cycle = None
+
+        #stuff to appear like it has the same variable interface as the standard AMSBlock. Definitely due for a refactor
+        self.name = name
+        self._vars = {}
+        self._params = {}
+        self._relations = []
+
+    def vars(self):
+        return self._vars.values()
+    
+    def params(self):
+        return self._params.values()
         
     
     def addNode(self, node):
@@ -78,6 +94,18 @@ class FSMAMSBlock:
                 self.evaluate_cycles = 0
                 self.event_this_cycle = None
                 return
+            
+    def optimizeHierarchy(self):
+        for name, node in self.nodes.items(): #iterate through all blocks in the FSM and convert to integer model
+            print(node)
+            node.ival_reg = intervallib.compute_intervals_for_block(node.block, rel_prec = 0.01)
+            fp_block = fixlib.to_fixed_point(node.ival_reg,node.block)
+            for v in fp_block.vars():
+                print(v)
+                input()
+            node.int_block = intlib.to_integer(fp_block)
+
+
         
         
         

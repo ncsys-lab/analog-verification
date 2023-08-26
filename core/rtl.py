@@ -6,10 +6,11 @@ from core.fpexpr import *
 from pymtl3 import *
 from itertools import count
 from pymtl3.passes.backends.verilog import *
-from types import FunctionType
+from types import FunctionType, CodeType
 from dill.source import getsource
 from pymtl3.stdlib.test_utils import mk_test_case_table, run_sim, config_model_with_cmdline_opts
 import math
+import inspect
 
 class RTLBlock:
 
@@ -52,7 +53,6 @@ class RTLBlock:
 
 
         for r in block.relations():
-            print("executing for relation: {}".format(r.rhs.pretty_print()))
             if r.lhs.name in self.regs.keys():
                 if(isinstance(r,Accumulate)):
                     expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
@@ -80,38 +80,31 @@ class RTLBlock:
         if not isinstance(type, IntType):
             print(type)
             raise Exception('wrong type')
-        print(math.trunc(value / type.scale))
+        #print(math.trunc(value / type.scale))
         return math.trunc(value / type.scale)
 
 
     #This function pretty much traverses our expression tree and turns it into a veriloggen expression tree
     def traverse_expr_tree(self, relation):
-        print(relation)
+
         if(isinstance(relation, Constant)):
-            print('type')
-            print(relation.value)
-            print(relation.op_name)
-            print(relation.type)
             const_wire = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[const_wire] = self.m.Wire(const_wire, relation.type.nbits)
             self.wires[const_wire].assign(self.scale_value_to_int(relation.value, relation.type))
             return self.wires[const_wire], relation.type.nbits
         elif(isinstance(relation, Var)):
             if(relation.name in self.regs.keys()):
-                print('type')
-                print(self.regs[relation.name])
                 return self.regs[relation.name], relation.type.nbits
             elif(relation.name in self.wires.keys()):
-                print('type')
-                print(self.wires[relation.name])
                 return self.wires[relation.name], relation.type.nbits
             elif(relation.name in self.inputs.keys()):
-                print('type')
-                print(self.inputs[relation.name])
                 return self.inputs[relation.name], relation.type.nbits
             
         elif(isinstance(relation, Param)):
-            return self.params[relation.name], relation.type.nbits
+            wire_name = "param_" + str(next(self.namecounter))
+            self.wires[wire_name] = self.m.Wire(wire_name, relation.type.nbits)
+            self.wires[wire_name].assign(self.params[relation.name])
+            return self.wires[wire_name], relation.type.nbits
         elif(isinstance(relation, Sum)):
             return self.traverse_expr_tree(relation.lhs)[0] + self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, Difference)):
@@ -119,7 +112,6 @@ class RTLBlock:
         elif(isinstance(relation, Product)):
             return self.traverse_expr_tree(relation.lhs)[0] * self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, Negation)): #disgusting
-            print(relation)
             if(relation.expr.type.signed == True):
                 imm_wire_debug_name = relation.op_name + "_imm_" + str(next(self.namecounter))
                 self.wires[imm_wire_debug_name] = self.m.Wire(imm_wire_debug_name, relation.type.nbits)
@@ -171,7 +163,7 @@ class RTLBlock:
                 self.wires[toUSint_wire] = self.m.Wire(toUSint_wire, relation.expr.type.nbits)
                 self.wires[toUSint_wire].assign(self.traverse_expr_tree(relation.expr)[0])
 
-            return self.wires[toUSint_wire][relation.type.nbits - 2:], relation.type.nbits
+            return self.wires[toUSint_wire][:relation.type.nbits - 2], relation.type.nbits
         
         elif(isinstance(relation, ToSInt)):
             if(relation.expr.type.signed):
@@ -232,9 +224,15 @@ class RTLBlock:
         
         
     def generate_pymtl_wrapper(self):
-
+        
         codeobj = compile(self.generate_construct_string(),"<String>", "exec" )
-        funcobj = FunctionType(codeobj.co_consts[0], globals(), "construct")
+
+        code = [c for c in codeobj.co_consts if isinstance(c, CodeType)][0]
+
+        param_tuple = tuple(map(lambda v: v,[c for c in codeobj.co_consts if isinstance(c, int)]))
+
+        funcobj = FunctionType(code, globals(), "construct", argdefs=param_tuple) #Used https://gist.github.com/dhagrow/d3414e3c6ae25dfa606238355aea2ca5
+
         self.pymtl_object_class = type( self.name, (VerilogPlaceholder, Component), {"construct" : funcobj})
     
     def pymtl_sim_begin(self):
@@ -264,7 +262,6 @@ class RTLBlock:
                 exec(srcex)
             if v.kind == VarKind.Output:
                 returndict[v.name] = getattr(self.dut, v.name).int()
-                print(returndict[v.name])
                 
         
         self.dut.sim_tick()
@@ -288,14 +285,3 @@ class RTLBlock:
         final_string = final_string + '    self.' + 'sys_clk' + ' = InPort(mk_bits( {} ))\n'.format(1)
         print(final_string)
         return final_string
-
-
-
-        
-        
-
-
-        
-            
-            
-

@@ -315,5 +315,5 @@ class FPTruncL(FPOp): #Very bad bug - Will
     def execute(self,args):
         value = self.expr.execute(args)
         rettype = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=self.type.signed)
-        print(repr(rettype))
+        #print(repr(rettype))
         return rettype

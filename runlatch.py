@@ -6,6 +6,10 @@ import numpy as np
 import core.fixedpoint as fixlib
 import core.rtl as rtllib
 import core.integer as intlib
+import core.block as blocklib
+from pymtl3 import *
+from tqdm import tqdm
+
 
 def read_yaml( f ):
     with open(f, 'r') as stream:
@@ -176,14 +180,14 @@ class StateMaker:
 
 
 
-SIM_TICKS     = 400000
+SIM_TICKS     = 400
 TICK_DIVISION = 100000
 SYSTEM_CLOCK = 1e-6
 
 
 initial_conditions = Initializer({'VREF': 2, 'VREG': 1.6, 'o': 3.3})
 
-comparator_latch_fsm = FSMAMSBlock(SYSTEM_CLOCK, TICK_DIVISION, initial_conditions)
+comparator_latch_fsm = FSMAMSBlock(SYSTEM_CLOCK, TICK_DIVISION, initial_conditions, "comparator_latch")
 
 # [precharge] [evaluate_wait] [evaluate_low] [evaluate_wait] [evaluate_low_high]
 precharge = StateMaker.create_precharge_state()
@@ -220,6 +224,49 @@ comparator_latch_fsm.starting_state = precharge
 comparator_latch_fsm.reset()
 
 
+def validate_model(blk,timestep,figname):
+    #print(blk)
+    
+    os = []
+    ts = []
+    oi = 0.0
+    cycles_per_sec = round(1/timestep)
+    print(cycles_per_sec)
+    for t in tqdm(range(SIM_TICKS)):
+    
+        values = blocklib.execute_block(blk,{'VREF': 2, 'VREG': 1.6, 'o': oi})
+        ts.append(t*timestep)
+        os.append(oi)
+
+
+        
+        oi = values["o"]
+
+    
+    os.append(oi)
+    ts.append(SIM_TICKS*timestep)
+
+    plt.plot(ts,os, label='os')
+    plt.legend(loc='best')
+    plt.show()
+
+def validate_pymtl_model(rtlblk,timestep,figname):
+    outs = []
+    ts = []
+    cycles_per_sec = round(1/timestep)
+    max_cycles = 30*cycles_per_sec
+    for t in tqdm(range(SIM_TICKS)):
+        values = rtlblk.pymtl_sim_tick({"VREG":Bits(rtlblk.block.get_var('VREG').type.nbits, v=rtlblk.scale_value_to_int(2,rtlblk.block.get_var('VREG').type)),
+                                        "VREF":Bits(rtlblk.block.get_var('VREF').type.nbits, v=rtlblk.scale_value_to_int(1.6,rtlblk.block.get_var('VREF').type))})
+        ts.append(t*timestep)
+        outi = values["out"]
+        outs.append(outi)
+
+    plt.plot(ts,outs)
+    plt.show()
+    #plt.savefig(figname)
+    #plt.clf()
+
 
 o = np.zeros(SIM_TICKS)
 t = np.linspace(0, SYSTEM_CLOCK * SIM_TICKS / TICK_DIVISION, SIM_TICKS)
@@ -231,19 +278,31 @@ for i in range(SIM_TICKS):
     o[i] = comparator_latch_fsm.state_vars['o']
     #print(comparator_latch_fsm.state_vars)
     
-plt.plot(t,o)
-plt.xlabel('')
-plt.savefig("resp.png")
+#plt.plot(t,o)
+#plt.xlabel('')
+#plt.savefig("resp.png")
 
 
 ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec = 0.01)
+validate_model(evaluate_low_low_high.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
 fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_low_high.block)
+validate_model(fp_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
+
+
 
 int_block = intlib.to_integer(fp_block)
+validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
-rtl_block = rtllib.RTLBlock(int_block,{'o':3.3})
 
-rtl_block.print_verilog_src()
+rtl_block = rtllib.RTLBlock(int_block,{'o':0})
 
+rtl_block.generate_verilog_src("./core/")
+rtl_block.generate_pymtl_wrapper()
+rtl_block.pymtl_sim_begin()
+validate_pymtl_model(rtl_block, SYSTEM_CLOCK/TICK_DIVISION, "rtl_dynamics.png")
+
+
+
+comparator_latch_fsm.optimizeHierarchy()
 
