@@ -82,7 +82,7 @@ class StateMaker:
     
     def create_evaluate_wait_high_low_state():
         evaluate_wait_high_low = Node('evaluate_wait_high_low')
-        vref = evaluate_wait_high_low.block.decl_var('VREF', VarKind.Input, RealType(0.0, 1.7, 0.01))
+        vref = evaluate_wait_high_low.block.decl_var('VREF', VarKind.Input, RealType(0.0, 3.3, 0.01))
         vreg = evaluate_wait_high_low.block.decl_var('VREG', VarKind.Input, RealType(0.0, 3.3, 0.01))
         o    = evaluate_wait_high_low.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.1))  
         out  = evaluate_wait_high_low.block.decl_var('out',  VarKind.Output, o.type)
@@ -101,7 +101,7 @@ class StateMaker:
 
     def create_evaluate_low_high_low_state(timestep):
         evaluate_wait_high_low = Node('evaluate_low_high_low')
-        vref = evaluate_wait_high_low.block.decl_var('VREF', VarKind.Input, RealType(0.0, 1.7, 0.01))
+        vref = evaluate_wait_high_low.block.decl_var('VREF', VarKind.Input, RealType(0.0, 3.3, 0.01))
         vreg = evaluate_wait_high_low.block.decl_var('VREG', VarKind.Input, RealType(0.0, 3.3, 0.01))
         o    = evaluate_wait_high_low.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.1))  
         out  = evaluate_wait_high_low.block.decl_var('out',  VarKind.Output, o.type)
@@ -127,7 +127,7 @@ class StateMaker:
     
     def create_evaluate_wait_low_high_state():
         evaluate_wait_low_high = Node('evaluate_wait_low_high')
-        vref = evaluate_wait_low_high.block.decl_var('VREF', VarKind.Input, RealType(0.0, 1.7, 0.01))
+        vref = evaluate_wait_low_high.block.decl_var('VREF', VarKind.Input, RealType(0.0, 3.3, 0.01))
         vreg = evaluate_wait_low_high.block.decl_var('VREG', VarKind.Input, RealType(0.0, 3.3, 0.01))
         o    = evaluate_wait_low_high.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.1))  
         out  = evaluate_wait_low_high.block.decl_var('out',  VarKind.Output, o.type)
@@ -147,22 +147,29 @@ class StateMaker:
     def create_evaluate_low_low_high_state(timestep):
         evaluate_low_low_high = Node('evaluate_low_low_high')
 
-        vref = evaluate_low_low_high.block.decl_var('VREF', VarKind.Input, RealType(0.0, 1.7, 0.01))
+        vref = evaluate_low_low_high.block.decl_var('VREF', VarKind.Input, RealType(0.0, 3.3, 0.01))
         vreg = evaluate_low_low_high.block.decl_var('VREG', VarKind.Input, RealType(0.0, 3.3, 0.01))
-        o    = evaluate_low_low_high.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.1))  
+        o    = evaluate_low_low_high.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.0001))  
         out  = evaluate_low_low_high.block.decl_var('out',  VarKind.Output, o.type)
 
         tau_exp = StateMaker.model_params.compute_low_high_tau( evaluate_low_low_high.block, vref, vreg )
 
         tau = evaluate_low_low_high.block.decl_var('tau', VarKind.Transient, \
-                                                   type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.01))
-
-        dodt = evaluate_low_low_high.block.decl_var('dodt', kind=VarKind.Transient, \
-                                                     type=intervallib.real_type_from_expr(evaluate_low_low_high.block, (Constant(3.3) - o) / tau, rel_prec=0.01))
+                                                   type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.0001))
         
+        dodt_expr = (Constant(3.3) - o) / tau
+        dodt = evaluate_low_low_high.block.decl_var('dodt', kind=VarKind.Transient, \
+                                                     type=intervallib.real_type_from_expr(evaluate_low_low_high.block,dodt_expr, rel_prec=0.00001)) #Changed precision
+
+        print('diffeq type!')
+        print(dodt.type)
+        print(tau.type)
+        print(o.type)
+        input()
+
         evaluate_low_low_high.block.decl_relation(VarAssign(tau, tau_exp))
         evaluate_low_low_high.block.decl_relation(VarAssign(out, o))
-        evaluate_low_low_high.block.decl_relation(VarAssign(dodt, (Constant(3.3) - o) / tau))
+        evaluate_low_low_high.block.decl_relation(VarAssign(dodt, dodt_expr))
         evaluate_low_low_high.block.decl_relation(Integrate(o, dodt, timestep=timestep))
 
         ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec=0.01)
@@ -228,6 +235,8 @@ def validate_model(blk,timestep,figname):
     #print(blk)
     
     os = []
+    dodts = []
+    tau = []
     ts = []
     oi = 0.0
     cycles_per_sec = round(1/timestep)
@@ -237,16 +246,28 @@ def validate_model(blk,timestep,figname):
         values = blocklib.execute_block(blk,{'VREF': 2, 'VREG': 1.6, 'o': oi})
         ts.append(t*timestep)
         os.append(oi)
+        dodts.append(values['dodt'])
+        tau.append(values['tau'])
 
 
-        
         oi = values["o"]
+        #print('o')
+        #print("%e" % values['o'])
+        #input()
+
 
     
-    os.append(oi)
-    ts.append(SIM_TICKS*timestep)
+
+    #os.append(oi)
+    #ts.append(SIM_TICKS*timestep)\
+    #dodts.append(0)
 
     plt.plot(ts,os, label='os')
+    #plt.plot(ts, dodts, label='dodt')
+    plt.legend(loc='best')
+    plt.show()
+    plt.clf()
+    plt.plot(ts, tau, label='tau')
     plt.legend(loc='best')
     plt.show()
 
@@ -286,14 +307,24 @@ for i in range(SIM_TICKS):
 ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec = 0.01)
 validate_model(evaluate_low_low_high.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
+evaluate_low_low_high.block.pretty_print_relations()
+
 fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_low_high.block)
 validate_model(fp_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
+fp_block.pretty_print_relations()
+for r in fp_block.relations():
+    if r.lhs.name == 'o':
+        print("o")
+        print(r)
+        input()
 
+
+input()
 
 int_block = intlib.to_integer(fp_block)
 validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
-
+int_block.pretty_print_relations()
 
 rtl_block = rtllib.RTLBlock(int_block,{'o':0})
 

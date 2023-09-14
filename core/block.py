@@ -2,7 +2,8 @@ from enum import Enum
 from typing import List
 from dataclasses import dataclass, field
 from core.expr import VarType, Var, VarAssign, Integrate, Accumulate, Param, Constant
-
+import core.fpexpr as fplib
+import core.intexpr as intlib
 
 class VarKind(Enum):
     Input = "input"
@@ -108,21 +109,46 @@ class AMSBlock:
         for r in self.relations():
             q(r.pretty_print())
         return "\n".join(stmts)
+    
+    def pretty_print_relations(self):
+        print("block {}".format(self.name))
+        for r in self.relations():
+            print(r.pretty_print())
 
 
 def execute_block(blk, args):
     vals = dict(args)
     
     for rel in blk.relations():
+        print(rel.pretty_print())
+        print(rel)
         if isinstance(rel, VarAssign):
             #print(rel.rhs)
+            if(isinstance(rel.rhs.type, intlib.IntType) and rel.lhs.name == 'dodt'):
+                print("dodt eq:")
+
+                print(rel.rhs.pretty_print())
+                print(rel.rhs.execute(vals))
+                print('dodt val ^^')
+                print(rel.rhs.type.scale)
+                #print(rel.rhs.type.to_real(rel.rhs.execute(vals)))
+                
             rhs_val = rel.rhs.execute(vals)
+            print()
             vals[rel.lhs.name] = rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Integrate):
             rhs_val = rel.rhs.execute(vals)
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Accumulate):
             rhs_val = rel.rhs.execute(vals)
+            if(isinstance(rel.rhs.type, intlib.IntType) and rel.lhs.name == 'o'):
+                print("o eq:")
+                print(vals)
+                print(rel.rhs.pretty_print())
+                print(rel.rhs.execute(vals))
+                print('o val ^^')
+                input()
+                
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
 
         else:

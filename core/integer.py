@@ -51,7 +51,22 @@ def mult_type_match(e,t):
             return mult_type_match(PadL(nbits = nbits, expr = e, value=0), t)
         else:
             nbits = e.type.nbits - t.nbits
-            return mult_type_match(TruncVal(nbits = nbits, expr = e,value=0), t)
+            return mult_type_match(TruncVal(nbits = nbits, expr = e), t)
+        
+def scale_type_match(e, t):
+    print("potential infinite loop in scale_type_match")
+    if e.type.scale == t.scale:
+        return e
+    else:
+        if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
+            nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
+            return scale_type_match(PadR(nbits = nbits, expr = e, ), t )
+        else:
+            nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
+            return scale_type_match(TruncR(nbits = nbits, expr = e), t )
+
+
+
         
 
 def fpexpr_to_intexpr(blk,expr):
@@ -98,15 +113,31 @@ def fpexpr_to_intexpr(blk,expr):
         #print("type_result Prod: {}".format(nexpr.type))
         return nexpr
     
-    elif isinstance(expr, exprlib.Quotient):
+    elif isinstance(expr, fpexprlib.FpQuotient):
         nlhs = rec(expr.lhs)
         nrhs = rec(expr.rhs)
+        
+        scale = exprlib.Constant( int( 1 / nrhs.type.scale ) )
+        scale.type = nlhs.type
+        scale = rec(scale)
 
-        nexpr = exprlib.Quotient(nlhs, nrhs)
+        norm_expr = exprlib.Product( nlhs, scale )
+        norm_expr.type = IntType( nbits = 2 * nlhs.type.nbits + 2 * int(nlhs.type.signed), scale = nlhs.type.scale ** 2, signed = nlhs.type.signed)
+
+        norm_expr.lhs = mult_type_match(norm_expr.lhs, norm_expr.type)
+        norm_expr.rhs = mult_type_match(norm_expr.rhs, norm_expr.type)
+
+        print(norm_expr.type)
+        
+        print(mult_type_match(scale_type_match(norm_expr, IntType.from_fixed_point_type(expr.type)), IntType.from_fixed_point_type(expr.type)).pretty_print())
+        print(mult_type_match(scale_type_match(norm_expr, IntType.from_fixed_point_type(expr.type)), IntType.from_fixed_point_type(expr.type)).type)                         
+        nexpr = IntQuotient( mult_type_match(scale_type_match(norm_expr, IntType.from_fixed_point_type(expr.type)), IntType.from_fixed_point_type(expr.type)), nrhs )
         nexpr.type = IntType.from_fixed_point_type(expr.type)
         nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
         nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
-        
+
+        print(nexpr.type)
+        input()
         return nexpr
     
 
@@ -192,7 +223,7 @@ def fpexpr_to_intexpr(blk,expr):
         typecheck_int_type(exint, exint.type, expr.type)
         
         return exint
-        
+    
     else:
         raise Exception("unhandled: %s" % expr.op_name)
 

@@ -18,8 +18,11 @@ class IntervalPrecRegistery:
         precision_expr: ufloat = None
 
         def initialize(self):
-            self.interval_expr = ufloat((self.upper+self.lower)/2, (self.upper-self.lower)/2)
-            self.precision_expr = ufloat((self.upper+self.lower)/2, (self.upper-self.lower)/2 + self.precision)
+            print(self.upper)
+            print(self.lower)
+            print(self.precision)
+            self.interval_expr = ufloat((self.upper+self.lower)/2, abs(self.upper-self.lower)/2)
+            self.precision_expr = ufloat((self.upper+self.lower)/2, abs(self.upper-self.lower)/2 + self.precision)
 
         def check(self):
             assert(self.precision > 0.0)
@@ -88,24 +91,29 @@ def build_interval_symtbl(block):
 
 def propagate_expr(reg, e,rel_prec):
     
-    if isinstance(e, exprlib.Constant):
-        lb = e.value - (e.value*rel_prec)
-        ub = e.value + (e.value*rel_prec)
-        info = reg.decl_info(e.ident, lb, ub, e.value*rel_prec)
+    if isinstance(e, exprlib.Constant) or isinstance(e, exprlib.Param):
+        lb = e.value - (abs(e.value)*rel_prec)
+        ub = e.value + (abs(e.value)*rel_prec)
+        info = reg.decl_info(e.ident, lb, ub, abs(e.value)*rel_prec)
         e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
-
     else:
         expr = e.sympy
-        
+        print(expr)
         vs = list(expr.free_symbols)
         
         ival_args = list(map(lambda v: reg.get_info(v.name).interval_expr, vs))
         prec_args = list(map(lambda v: reg.get_info(v.name).precision_expr, vs))
 
+        print(ival_args)
+        print(prec_args)
+        
         lambd = sympy.lambdify(vs,expr)
         ival_expr = lambd(*ival_args)
         prec_expr = lambd(*prec_args)
 
+        print(ival_expr)
+        print(prec_expr)
+        #input()
         
         info=reg.decl_sym_info(e.ident, interval_expr=ival_expr, precision_expr=prec_expr, relative_precision=rel_prec)
         e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
@@ -124,7 +132,7 @@ def compute_intervals_for_block(block, rel_prec):
         if isinstance(rel,exprlib.VarAssign):
             for node in rel.rhs.nodes():
                 propagate_expr(reg,node, rel_prec)
-           
+            
             info = reg.get_info(rel.rhs.ident)
             reg.decl_info(rel.ident,info.lower, info.upper, info.precision)
             reg.decl_info(rel.lhs.name,info.lower,info.upper, info.precision)

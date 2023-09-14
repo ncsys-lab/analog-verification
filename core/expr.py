@@ -145,8 +145,11 @@ class Var(Expression):
         return set([self])
 
     def execute(self,args):
+        
         value = args[self.name]
+        print("(float_var_{}: {})".format(self.name,float(value)))
         newv = self.type.from_real(value)
+        
         self.type.typecheck_value(newv)
         return newv 
 
@@ -165,7 +168,7 @@ class Param(Expression):
 
     @property
     def sympy(self) -> sym.Expr:
-        return sym.Symbol(self.name, real=True)
+        return sym.RealNumber(self.value)
 
     @property
     def variables(self) -> "Set[Real]":
@@ -173,6 +176,7 @@ class Param(Expression):
 
     def execute(self,args):
         newv = self.type.from_real(self.value)
+        print("(float_param: {})".format(float(newv)))
         self.type.typecheck_value(newv)
         return newv 
 
@@ -248,6 +252,10 @@ class Sum(Expression):
     def execute(self, args):
         result = self.lhs.execute(args) + self.rhs.execute(args)
         tc_result = self.type.typecast_value(result)
+        print("{} + {}".format(float(self.lhs.execute(args)), float(self.rhs.execute(args))))
+        print("expr_type: {}".format(self.lhs))
+        print("(float_sum: {})".format(float(result)))
+        print("(float_sum_tc: {})".format(float(tc_result)))
         self.type.typecheck_value(tc_result)
         return tc_result
 
@@ -298,7 +306,11 @@ class Product(Expression):
 
     def execute(self,args):
         result = self.lhs.execute(args)*self.rhs.execute(args)
+        print(self.type)
+        print(" {} * {} = {}".format(self.lhs.execute(args), self.rhs.execute(args), result))
         tc_result = self.type.typecast_value(result)
+        print("(float_mult: {})".format(float(result)))
+        print("(float_mult_tc: {})".format(float(tc_result)))
         self.type.typecheck_value(tc_result)
         return tc_result
 
@@ -393,8 +405,12 @@ class Integrate(Expression):
     op_name : ClassVar[str]= "integ"
 
     def __post_init__(self):
+        print('timestep')
+        print(self.timestep)
+        
         self.lhs = self.ddt_var
         self.rhs = Product(Constant(self.timestep),self.rhs_var)
+        print(Constant(self.timestep))
 
 
     def children(self):
