@@ -122,23 +122,26 @@ def fpexpr_to_intexpr(blk,expr):
         scale = rec(scale)
 
         norm_expr = exprlib.Product( nlhs, scale )
-        norm_expr.type = IntType( nbits = 2 * nlhs.type.nbits + 2 * int(nlhs.type.signed), scale = nlhs.type.scale ** 2, signed = nlhs.type.signed)
+        norm_expr.type = IntType( nbits = 2 * nlhs.type.nbits + 2 * int(nlhs.type.signed), scale = nlhs.type.scale, signed = nlhs.type.signed)
 
         norm_expr.lhs = mult_type_match(norm_expr.lhs, norm_expr.type)
         norm_expr.rhs = mult_type_match(norm_expr.rhs, norm_expr.type)
 
-        print(norm_expr.type)
-        
-        print(mult_type_match(scale_type_match(norm_expr, IntType.from_fixed_point_type(expr.type)), IntType.from_fixed_point_type(expr.type)).pretty_print())
-        print(mult_type_match(scale_type_match(norm_expr, IntType.from_fixed_point_type(expr.type)), IntType.from_fixed_point_type(expr.type)).type)                         
         nexpr = IntQuotient( mult_type_match(scale_type_match(norm_expr, IntType.from_fixed_point_type(expr.type)), IntType.from_fixed_point_type(expr.type)), nrhs )
         nexpr.type = IntType.from_fixed_point_type(expr.type)
         nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
         nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
 
-        print(nexpr.type)
-        input()
+
         return nexpr
+    
+    elif isinstance(expr, fpexprlib.FpReciprocal):
+        nexpr = rec(expr.expr)
+
+        recip = IntReciprocal(expr = nexpr)
+        recip.type = IntType.from_fixed_point_type(expr.type)
+
+        return recip
     
 
     elif isinstance(expr, exprlib.Negation):

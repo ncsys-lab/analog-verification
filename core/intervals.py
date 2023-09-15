@@ -18,9 +18,7 @@ class IntervalPrecRegistery:
         precision_expr: ufloat = None
 
         def initialize(self):
-            print(self.upper)
-            print(self.lower)
-            print(self.precision)
+
             self.interval_expr = ufloat((self.upper+self.lower)/2, abs(self.upper-self.lower)/2)
             self.precision_expr = ufloat((self.upper+self.lower)/2, abs(self.upper-self.lower)/2 + self.precision)
 
@@ -98,21 +96,18 @@ def propagate_expr(reg, e,rel_prec):
         e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
     else:
         expr = e.sympy
-        print(expr)
+
         vs = list(expr.free_symbols)
         
         ival_args = list(map(lambda v: reg.get_info(v.name).interval_expr, vs))
         prec_args = list(map(lambda v: reg.get_info(v.name).precision_expr, vs))
 
-        print(ival_args)
-        print(prec_args)
         
         lambd = sympy.lambdify(vs,expr)
         ival_expr = lambd(*ival_args)
         prec_expr = lambd(*prec_args)
 
-        print(ival_expr)
-        print(prec_expr)
+
         #input()
         
         info=reg.decl_sym_info(e.ident, interval_expr=ival_expr, precision_expr=prec_expr, relative_precision=rel_prec)

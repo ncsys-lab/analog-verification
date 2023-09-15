@@ -50,7 +50,6 @@ class IntType(VarType):
 
     def to_real(self,v):
         v_tc = self.typecast_value(v)
-        print(v)
         return v*self.scale
 
     def typecast_value(self,v):
@@ -99,12 +98,28 @@ class IntQuotient(Expression):
     
     
     def execute(self, args):
-        #This is just a div by two ints so you need some extra wizardry.
+
         result = ( self.lhs.execute(args) ) // self.rhs.execute(args)
-        print("in_div:")
-        print(self.lhs.pretty_print())
-        print("{} // {} = {}".format(self.lhs.execute(args), self.rhs.execute(args), result))
-        input()
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
+    
+@dataclass
+class IntReciprocal(Expression):
+    expr: Expression
+    type = None
+    op_name : ClassVar[str] = 'fpdiv'
+
+    def children(self):
+        return [self.lhs, self.rhs]
+    
+    def pretty_print(self):
+        return "( 1 / ( {} ) )".format(self.expr.pretty_print())
+    
+    def execute(self, args):
+
+        result =  2**self.type.nbits // self.expr.execute(args)
+        
         tc_result = self.type.typecast_value(result)
         self.type.typecheck_value(tc_result)
         return tc_result
@@ -169,10 +184,7 @@ class TruncR(IntOp):
     def execute(self,args):
         
         val = self.expr.execute(args) // (2**self.nbits)
-        print(self.op_name)
-        print((2**self.nbits))
-        print(val)
-        #input()
+
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
         return val_tc
@@ -239,20 +251,11 @@ class TruncVal(IntOp): #Will
         print(self.expr)
         val = self.expr.execute(args) #oh my gosh removing // 2**nbits fixed it
 
-        #This was screwed up because it needs to truncate bits rather than round the max.
-        print('truncation')
-        print(val)
-        print(bin(val))
-        print(bin(val)[0:self.type.nbits- self.nbits - 1])
-        #print( int(bin(val)[0:self.type.nbits- self.nbits - 1]) )
         if( val > 2**( self.type.nbits ) ):
             val = int(bin(val)[0:self.type.nbits- self.nbits - 1],2)
 
-        print('val of val')
-        print(val)
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
-        print(val_tc)
         return val_tc
 
     def pretty_print(self):

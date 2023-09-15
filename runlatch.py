@@ -157,15 +157,9 @@ class StateMaker:
         tau = evaluate_low_low_high.block.decl_var('tau', VarKind.Transient, \
                                                    type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.0001))
         
-        dodt_expr = (Constant(3.3) - o) / tau
+        dodt_expr = (Constant(3.3) - o) * Reciprocal( tau )
         dodt = evaluate_low_low_high.block.decl_var('dodt', kind=VarKind.Transient, \
                                                      type=intervallib.real_type_from_expr(evaluate_low_low_high.block,dodt_expr, rel_prec=0.00001)) #Changed precision
-
-        print('diffeq type!')
-        print(dodt.type)
-        print(tau.type)
-        print(o.type)
-        input()
 
         evaluate_low_low_high.block.decl_relation(VarAssign(tau, tau_exp))
         evaluate_low_low_high.block.decl_relation(VarAssign(out, o))
@@ -176,19 +170,9 @@ class StateMaker:
         return evaluate_low_low_high
     
 
-    
 
-    
-
-
-
-
-
-
-
-
-SIM_TICKS     = 400
-TICK_DIVISION = 100000
+SIM_TICKS     = 4000
+TICK_DIVISION = 1000000
 SYSTEM_CLOCK = 1e-6
 
 
@@ -307,20 +291,12 @@ for i in range(SIM_TICKS):
 ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec = 0.01)
 validate_model(evaluate_low_low_high.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
-evaluate_low_low_high.block.pretty_print_relations()
+#evaluate_low_low_high.block.pretty_print_relations()
 
 fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_low_high.block)
 validate_model(fp_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
 fp_block.pretty_print_relations()
-for r in fp_block.relations():
-    if r.lhs.name == 'o':
-        print("o")
-        print(r)
-        input()
-
-
-input()
 
 int_block = intlib.to_integer(fp_block)
 validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")

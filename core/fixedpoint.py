@@ -31,12 +31,7 @@ def fixed_point_reprs(ival_reg):
     for name in ival_reg.variables():
         fpr = get_fpr(ival_reg.get_info(name))
         reg.set_type(name, fpr)
-        if(name == 'dodt'):
-            print('dodt')
-            print(fpr.integer)
-            print(fpr.fractional)
-            print(ival_reg.get_info(name))
-            input()
+
 
 
     for ident in ival_reg.expr_ids():
@@ -161,7 +156,7 @@ def fixed_point_expr(reg,expr):
 
         return prod
     
-    if isinstance(expr, exprlib.Quotient): #added by will
+    elif isinstance(expr, exprlib.Quotient): #added by will
         lhse = rec(expr.lhs)
         rhse = rec(expr.rhs)
         lhse, rhse, result_type = expr_type_match(lhse, rhse)
@@ -169,14 +164,27 @@ def fixed_point_expr(reg,expr):
         expr_type = reg.get_type(expr.ident)
         prod = FpQuotient(lhse, rhse)
         
-        print(lhse.type.signed)
-        print(rhse.type.signed)
+
         prod.type = FixedPointType.from_integer_scale(integer=lhse.type.integer + rhse.type.integer - rhse.type.log_scale + int(rhse.type.signed or lhse.type.signed), \
                     log_scale=lhse.type.log_scale, \
                     signed=rhse.type.signed or lhse.type.signed)
 
         prod_typematch = type_match(prod, expr_type)
         return prod_typematch
+    
+    elif isinstance(expr, exprlib.Reciprocal):
+        exprr = rec(expr.expr)
+        expr_type = reg.get_type(expr.ident)
+
+        recip = FpReciprocal(exprr)
+        assert exprr.type.log_scale <= 0
+        recip.type = FixedPointType.from_integer_scale(integer = exprr.type.fractional + exprr.type.signed, \
+                                                       log_scale = exprr.type.integer, \
+                                                        signed = exprr.type.signed )
+
+        typematch = type_match(recip, expr_type)
+        return typematch
+        
 
     elif isinstance(expr, exprlib.Sum): #improved by will
         lhse = rec(expr.lhs)

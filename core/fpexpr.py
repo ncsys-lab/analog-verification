@@ -30,16 +30,14 @@ class FixedPointType(VarType):
     @classmethod
     def from_interval_precision(self,lower,upper,precision):
         is_signed = lower < 0.0
-        #print('lower: {}'.format(lower))
-        #print('upper: {}'.format(upper))
+
         #nvals = (max(abs(upper), abs(lower))+precision)/precision
         #Will changed this because there was a case when max(|upper|,|lower|) < precision^2 - precision
         nvals = max(abs(upper),abs(lower)) / precision
-        #print('nvals: {}'.format(nvals))
-        #print('prec: {}'.format(precision) )
+
         total_bits = math.ceil(math.log2(nvals))
         scale_bits = math.floor(math.log2(precision))
-        #print("scale bits: {}".format(scale_bits))
+
         if scale_bits < 0:
             fractional = abs(scale_bits)
             integer = max(total_bits - fractional,0) + int( lower < 0)
@@ -230,7 +228,7 @@ class FPTruncInt(FPOp):
         value = float(self.expr.execute(args))
 
         new_value = FixedPoint( value, n=self.type.n , m=self.type.m, signed=self.type.signed, overflow='clamp', overflow_alert='warning')
-        print("fp_truncInt: {}".format(float(new_value)))
+
         self.type.typecheck_value(new_value)
         #If we are clamping the value here, I believe we should not care because the difference should be large.
         """
@@ -291,10 +289,7 @@ class FPToUnsigned(FPOp): #FP Operation,
     
     def execute(self,args):
         value = float(self.expr.execute(args))
-        print(self)
-        print(value)
-        print(self.expr.type.m)
-        print(self.pretty_print())
+
         new_value = FixedPoint(value,n=self.expr.type.n, m=self.expr.type.m - 1, signed=False, rounding='in')
         
         self.type.typecheck_value(new_value)
@@ -327,22 +322,41 @@ class FpQuotient(Expression):
     
     def execute(self, args):
         result_float = float(self.lhs.execute(args)) / float(self.rhs.execute(args)) 
-        print("{} / {} = {}".format(float(self.lhs.execute(args)), float(self.rhs.execute(args)), result_float))
-        print()
-        print(self.lhs.type.m)
-        print(self.rhs.type.m)
-        print(self.lhs.type.n)
-        print(self.rhs.type.n)
-        print(self.lhs.type.signed)
-        print(self.rhs.type.signed)
-        print(self.rhs.type.log_scale)
-        #input()
+
         result = FixedPoint(result_float, m=self.lhs.type.m + self.rhs.type.n + self.rhs.type.m + bool(self.rhs.type.signed or self.lhs.type.signed), n=self.lhs.type.n, signed=self.type.signed, overflow_alert='error')
 
         tc_result = self.type.typecast_value(result)
         self.type.typecheck_value(tc_result)
         return tc_result
 
+@dataclass
+class FpReciprocal(Expression):
+    expr: Expression
+    type = None
+    op_name : ClassVar[str] = 'fprecip'
+
+    def children(self):
+        [self.expr]
+    
+    def sympy(self) -> sym.Expr:
+        return 1 / self.expr.sympy
+    
+    @property
+    def variables(self) -> "Set[Real]":
+        return self.expr
+    
+    def pretty_print(self):
+        return " 1 / ( {} )".format(self.expr.pretty_print())
+
+    def execute(self, args):
+        fxp_expr = self.expr.execute(args)
+        result_float = (1 / float(fxp_expr)) #1/fp_expr
+
+        result = FixedPoint(result_float, m = self.expr.type.n + int(self.expr.type.signed), n = self.expr.type.m, signed = self.expr.type.signed)
+
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
 
 @dataclass
 class FPTruncL(FPOp): #Probably should not have use this for floating points
@@ -368,5 +382,5 @@ class FPTruncL(FPOp): #Probably should not have use this for floating points
     def execute(self,args):
         value = self.expr.execute(args)
         rettype = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=self.type.signed)
-        #print(repr(rettype))
+
         return rettype

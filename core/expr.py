@@ -147,9 +147,7 @@ class Var(Expression):
     def execute(self,args):
         
         value = args[self.name]
-        print("(float_var_{}: {})".format(self.name,float(value)))
         newv = self.type.from_real(value)
-        
         self.type.typecheck_value(newv)
         return newv 
 
@@ -176,7 +174,6 @@ class Param(Expression):
 
     def execute(self,args):
         newv = self.type.from_real(self.value)
-        print("(float_param: {})".format(float(newv)))
         self.type.typecheck_value(newv)
         return newv 
 
@@ -209,7 +206,7 @@ class Constant(Expression):
     def execute(self,args):
         newv = self.type.from_real(self.value)
         self.type.typecheck_value(newv)
-        #print(newv)
+
         return newv 
 
     def pretty_print(self):
@@ -252,10 +249,7 @@ class Sum(Expression):
     def execute(self, args):
         result = self.lhs.execute(args) + self.rhs.execute(args)
         tc_result = self.type.typecast_value(result)
-        print("{} + {}".format(float(self.lhs.execute(args)), float(self.rhs.execute(args))))
-        print("expr_type: {}".format(self.lhs))
-        print("(float_sum: {})".format(float(result)))
-        print("(float_sum_tc: {})".format(float(tc_result)))
+
         self.type.typecheck_value(tc_result)
         return tc_result
 
@@ -305,12 +299,10 @@ class Product(Expression):
         return self.lhs.variables | self.rhs.variables
 
     def execute(self,args):
+
         result = self.lhs.execute(args)*self.rhs.execute(args)
-        print(self.type)
-        print(" {} * {} = {}".format(self.lhs.execute(args), self.rhs.execute(args), result))
+
         tc_result = self.type.typecast_value(result)
-        print("(float_mult: {})".format(float(result)))
-        print("(float_mult_tc: {})".format(float(tc_result)))
         self.type.typecheck_value(tc_result)
         return tc_result
 
@@ -372,6 +364,33 @@ class Quotient(Expression):
         tc_result = self.type.typecast_value(result)
         self.type.typecheck_value(tc_result)
         return tc_result
+    
+@dataclass 
+class Reciprocal(Expression):
+    expr: Expression
+    type = None
+    op_name: ClassVar[str] = "recip"
+
+    def children(self):
+        return[self.expr]
+    
+    @property
+    def sympy(self) -> sym.Expr:
+        return 1 / self.expr.sympy
+    
+    @property
+    def variables(self) -> "Set[Real]":
+        return self.expr
+    
+    def pretty_print(self):
+        return " 1 / ( {} )".format(self.expr.pretty_print())
+    
+    def execute(self, args):
+        result = 1 / self.expr.execute(args)
+        tc_result = self.type.typecast_value(result)
+        self.type.typecheck_value(tc_result)
+        return tc_result
+
 
 @dataclass
 class VarAssign(Expression):
@@ -405,13 +424,8 @@ class Integrate(Expression):
     op_name : ClassVar[str]= "integ"
 
     def __post_init__(self):
-        print('timestep')
-        print(self.timestep)
-        
         self.lhs = self.ddt_var
         self.rhs = Product(Constant(self.timestep),self.rhs_var)
-        print(Constant(self.timestep))
-
 
     def children(self):
         return [self.lhs, self.rhs]
@@ -427,7 +441,6 @@ class Accumulate(Expression):
     lhs: Expression
     rhs: Expression
     type  = None
-
 
     def pretty_print(self):
         return "%s+=%s" % (self.lhs.pretty_print(), self.rhs.pretty_print())

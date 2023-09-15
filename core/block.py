@@ -123,31 +123,16 @@ def execute_block(blk, args):
         print(rel.pretty_print())
         print(rel)
         if isinstance(rel, VarAssign):
-            #print(rel.rhs)
-            if(isinstance(rel.rhs.type, intlib.IntType) and rel.lhs.name == 'dodt'):
-                print("dodt eq:")
-
-                print(rel.rhs.pretty_print())
-                print(rel.rhs.execute(vals))
-                print('dodt val ^^')
-                print(rel.rhs.type.scale)
-                #print(rel.rhs.type.to_real(rel.rhs.execute(vals)))
-                
+      
             rhs_val = rel.rhs.execute(vals)
-            print()
+
             vals[rel.lhs.name] = rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Integrate):
             rhs_val = rel.rhs.execute(vals)
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Accumulate):
             rhs_val = rel.rhs.execute(vals)
-            if(isinstance(rel.rhs.type, intlib.IntType) and rel.lhs.name == 'o'):
-                print("o eq:")
-                print(vals)
-                print(rel.rhs.pretty_print())
-                print(rel.rhs.execute(vals))
-                print('o val ^^')
-                input()
+
                 
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
 
