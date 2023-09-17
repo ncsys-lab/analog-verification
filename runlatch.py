@@ -149,7 +149,7 @@ class StateMaker:
 
         vref = evaluate_low_low_high.block.decl_var('VREF', VarKind.Input, RealType(0.0, 3.3, 0.01))
         vreg = evaluate_low_low_high.block.decl_var('VREG', VarKind.Input, RealType(0.0, 3.3, 0.01))
-        o    = evaluate_low_low_high.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.0001))  
+        o    = evaluate_low_low_high.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 1e-9))  
         out  = evaluate_low_low_high.block.decl_var('out',  VarKind.Output, o.type)
 
         tau_exp = StateMaker.model_params.compute_low_high_tau( evaluate_low_low_high.block, vref, vreg )
@@ -171,8 +171,8 @@ class StateMaker:
     
 
 
-SIM_TICKS     = 4000
-TICK_DIVISION = 1000000
+SIM_TICKS     = 400
+TICK_DIVISION = 100000
 SYSTEM_CLOCK = 1e-6
 
 
@@ -225,9 +225,10 @@ def validate_model(blk,timestep,figname):
     oi = 0.0
     cycles_per_sec = round(1/timestep)
     print(cycles_per_sec)
+    values = blocklib.execute_block(blk,{'VREF': 2, 'VREG': 1.6, 'o': oi})
     for t in tqdm(range(SIM_TICKS)):
     
-        values = blocklib.execute_block(blk,{'VREF': 2, 'VREG': 1.6, 'o': oi})
+        values = blocklib.execute_block(blk,values)
         ts.append(t*timestep)
         os.append(oi)
         dodts.append(values['dodt'])
@@ -235,9 +236,11 @@ def validate_model(blk,timestep,figname):
 
 
         oi = values["o"]
-        #print('o')
-        #print("%e" % values['o'])
-        #input()
+        print('dodt')
+        print("%e" % values['dodt'])
+        print('o')
+        print("%e" % values['o'])
+        
 
 
     
@@ -277,11 +280,7 @@ o = np.zeros(SIM_TICKS)
 t = np.linspace(0, SYSTEM_CLOCK * SIM_TICKS / TICK_DIVISION, SIM_TICKS)
 
 
-for i in range(SIM_TICKS):
 
-    comparator_latch_fsm.evaluationClockTick()
-    o[i] = comparator_latch_fsm.state_vars['o']
-    #print(comparator_latch_fsm.state_vars)
     
 #plt.plot(t,o)
 #plt.xlabel('')
@@ -289,12 +288,12 @@ for i in range(SIM_TICKS):
 
 
 ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec = 0.01)
-validate_model(evaluate_low_low_high.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
+#validate_model(evaluate_low_low_high.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
 #evaluate_low_low_high.block.pretty_print_relations()
 
 fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_low_high.block)
-validate_model(fp_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
+#validate_model(fp_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
 fp_block.pretty_print_relations()
 

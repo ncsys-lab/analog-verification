@@ -118,13 +118,21 @@ class AMSBlock:
 
 def execute_block(blk, args):
     vals = dict(args)
+
     
     for rel in blk.relations():
-        print(rel.pretty_print())
-        print(rel)
+
         if isinstance(rel, VarAssign):
       
             rhs_val = rel.rhs.execute(vals)
+            if(rel.lhs.name == 'dodt'):
+                print('dodt:')
+                print(rel.rhs.type)
+                print(rel.rhs.execute(vals))
+                print(rel.rhs.pretty_print())
+                print(rel.rhs.type.to_real(rhs_val))
+                
+
 
             vals[rel.lhs.name] = rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Integrate):
@@ -132,6 +140,18 @@ def execute_block(blk, args):
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Accumulate):
             rhs_val = rel.rhs.execute(vals)
+            
+            if(rel.lhs.name == 'o'):
+                print('o:')
+                obj = rel.rhs.expr
+                print(obj.type.to_real(obj.execute(vals)))
+                print(obj.execute(vals))
+                print(obj.type)
+                print(obj.expr.type)
+                print(obj.pretty_print())
+
+                
+
 
                 
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)

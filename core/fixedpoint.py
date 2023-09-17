@@ -104,12 +104,20 @@ def type_match(e,t):
         else:
             rem_trunc = nbits_trunc - e.type.fractional
             return type_match(FPTruncInt(FPTruncFrac(expr=e, nbits=e.type.fractional), nbits=rem_trunc), t)
-
-    if e.type.scale != t.scale:
-        raise NotImplementedError
-
+    
     if e.type.fractional > t.fractional:
-        raise NotImplementedError
+        return type_match(FPTruncFrac(expr=e,nbits= e.type.fractional - t.fractional), t)
+
+    """
+    if e.type.scale != t.scale:
+        print(e.type)
+        print(t)
+        print(t.log_scale  - e.type.log_scale)
+        input()
+        return type_match(FPIncreaseScale(expr = e, nbits = t.log_scale  - e.type.log_scale), t)
+    """
+
+
 
     print('idkwyn')
     raise NotImplementedError
@@ -127,6 +135,9 @@ def expr_type_match(lhse, rhse):
 
 
 def mult_type_match(e, t):
+    print("mult_type_match")
+    input()
+
     return FPTruncL(expr=e, nbits= e.type.nbits - t.nbits)
 
 
@@ -231,7 +242,13 @@ def fixed_point_expr(reg,expr):
     elif isinstance(expr, exprlib.VarAssign):
         lhse =  rec(expr.lhs)
         rhse = rec(expr.rhs)
+        
+
         rhse_tm = type_match(rhse,lhse.type)
+        print(lhse.type)
+        print(rhse_tm.type)
+        print(lhse.type.scale)
+        print(rhse.type.scale)
         return exprlib.VarAssign(lhse, rhse_tm)
 
     elif isinstance(expr, exprlib.Integrate):
@@ -269,6 +286,11 @@ def fixed_point_block(reg,block):
         #print("stariting relation {}: {}".format(rel.ident, rel))
         if isinstance(rel,exprlib.VarAssign):
             eq_expr = fixed_point_expr(reg,rel)
+            print(rel)
+            print(eq_expr.rhs.pretty_print())
+            print(eq_expr.lhs.type)
+            print(eq_expr.rhs.type)
+            input()
             fp_block.decl_relation(eq_expr)
         elif isinstance(rel, exprlib.Integrate):
             int_expr = fixed_point_expr(reg,rel)

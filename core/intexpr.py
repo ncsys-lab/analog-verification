@@ -38,12 +38,14 @@ class IntType(VarType):
         assert(isinstance(other, IntType))
         return other.nbits == self.nbits \
                 and other.scale == self.scale \
-                and other.signed == self.signed
+                and other.signed == self.signed \
 
     def from_real(self,v):
 
         unsc = round(v/self.scale)
         v_tc = min(self.upper,max(self.lower,unsc))
+        if(v < self.scale):
+            print("[WARN] scale > value, possible truncation by precision!")
         if(abs(self.to_real(v_tc) - v) > self.scale):
             print("[WARN] from_real %f => %f" % (v, self.to_real(v_tc)))
         return v_tc
@@ -248,11 +250,18 @@ class TruncVal(IntOp): #Will
         return IntType(nbits = typ.nbits - self.nbits, scale=typ.scale, signed = typ.signed)
 
     def execute(self,args):
-        print(self.expr)
+
         val = self.expr.execute(args) #oh my gosh removing // 2**nbits fixed it
 
+        print('truncval?')
+        print(val)
         if( val > 2**( self.type.nbits ) ):
-            val = int(bin(val)[0:self.type.nbits- self.nbits - 1],2)
+            print(self.expr.type.nbits - self.nbits - 1)
+            print(bin(val)[0:])
+            print(bin(val)[0:self.expr.type.nbits - self.nbits + 2])
+            val = int(bin(val)[0:self.expr.type.nbits - self.nbits + 2],2)
+            
+            print(val)
 
         val_tc = self.type.typecast_value(val)
         self.type.typecheck_value(val_tc)
@@ -280,4 +289,18 @@ class TruncL(IntOp):
     
     def pretty_print(self):
         return 'truncL(%s,%s)' % (self.expr.pretty_print(), self.nbits)
+    
+@dataclass
+class IntIncreaseScale(IntOp):
+    nbits : int
+    op_name: ClassVar[str]= 'IntIncreaseScale'
+
+    def execute(self,args):
+        val = self.expr.execute(args)
+        val_tc = self.type.typecast_value(val)
+        self.type.typecheck_value(val_tc)
+        return val_tc
+    
+    def pretty_print(self):
+        return 'intincreasescale(%s,%s)' % (self.expr.pretty_print(), self.nbits)
 

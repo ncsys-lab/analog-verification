@@ -102,7 +102,7 @@ class FSMAMSBlock:
             fp_block = fixlib.to_fixed_point(node.ival_reg,node.block)
             for v in fp_block.vars():
                 print(v)
-                input()
+
             node.int_block = intlib.to_integer(fp_block)
 
 

@@ -147,8 +147,10 @@ class Var(Expression):
     def execute(self,args):
         
         value = args[self.name]
+
         newv = self.type.from_real(value)
         self.type.typecheck_value(newv)
+
         return newv 
 
     def pretty_print(self):
@@ -276,7 +278,12 @@ class Difference(Expression):
     
     def execute(self, args):
         result = self.lhs.execute(args) - self.rhs.execute(args)
+        print(" {} - {}".format(self.lhs.execute(args), self.type.to_real(self.rhs.execute(args))))
+        print(result)
+        print(self.type)
+        print(self.pretty_print())
         tc_result = self.type.typecast_value(result)
+        
         self.type.typecheck_value(tc_result)
         return tc_result
 

@@ -112,7 +112,8 @@ class RTLBlock:
         elif(isinstance(relation, Product)):
             return self.traverse_expr_tree(relation.lhs)[0] * self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, IntReciprocal)):
-            return  1 << relation.type.nbits / self.traverse_expr_tree(relation.expr)[0], relation.type.nbits
+            expression = self.traverse_expr_tree(relation.expr)
+            return   Int((2 ** expression[1]) - 1, width=expression[1])  / expression[0], relation.type.nbits
         elif(isinstance(relation, Negation)): #disgusting
             if(relation.expr.type.signed == True):
                 imm_wire_debug_name = relation.op_name + "_imm_" + str(next(self.namecounter))

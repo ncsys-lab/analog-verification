@@ -145,10 +145,8 @@ class FPTruncFrac(FPOp):
         value = FixedPoint(self.expr.execute(args))
         new_bitvec= bin(value.bits >> self.nbits)
 
-        print(float(FixedPoint(new_bitvec, n=self.expr.type.n - self.nbits, m=self.expr.type.m, signed=self.expr.type.signed)))
         new_value = FixedPoint(new_bitvec, n=self.expr.type.n - self.nbits, m=self.expr.type.m, signed=self.expr.type.signed)
         
-        print("fp_truncF: {}".format(float(new_value)))
         self.type.typecheck_value(new_value)
         if abs(self.expr.type.to_real(value) - self.type.to_real(new_value)) > self.type.scale:
             raise Exception("Fractional truncate produced incorrect value: original=%f, truncated=%f" % (float(value), float(new_value)))
@@ -359,7 +357,7 @@ class FpReciprocal(Expression):
         return tc_result
 
 @dataclass
-class FPTruncL(FPOp): #Probably should not have use this for floating points
+class FPTruncL(FPOp): 
     nbits: int
     op_name : ClassVar[str] = 'fpTruncL'
 
@@ -384,3 +382,20 @@ class FPTruncL(FPOp): #Probably should not have use this for floating points
         rettype = FixedPoint(float(value),n=self.type.n, m=self.type.m, signed=self.type.signed)
 
         return rettype
+    
+
+
+@dataclass
+class  FPIncreaseScale(FPOp):
+    nbits: int
+    op_name : ClassVar[str] = 'fpIncScale'
+
+    @property
+    def type(self):
+        return FixedPointType.from_integer_scale(integer=self.expr.type.integer, log_scale =self.expr.type.log_scale + self.nbits, signed=self.expr.type.signed)
+    
+    def pretty_print(self):
+        return "{}({})".format(self.op_name, self.expr.pretty_print())
+    
+    def execute(self,args):
+        return self.expr.execute(args)

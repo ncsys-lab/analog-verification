@@ -55,12 +55,12 @@ def mult_type_match(e,t):
         
 def scale_type_match(e, t):
     print("potential infinite loop in scale_type_match")
-    if e.type.scale == t.scale:
+    if e.type.matches(t):
         return e
     else:
         if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
             nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
-            return scale_type_match(PadR(nbits = nbits, expr = e, ), t )
+            return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t)
         else:
             nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
             return scale_type_match(TruncR(nbits = nbits, expr = e), t )
@@ -100,6 +100,8 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr.type = IntType.from_fixed_point_type(expr.type)
         nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
         nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
+
+        typecheck_int_type(nexpr, nexpr.type, expr.type)
         #print("type_result Prod: {}".format(nexpr.type))
         #print(nexpr.lhs)
         #print(nexpr.rhs)
@@ -111,6 +113,7 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr = exprlib.Difference(nlhs,nrhs)
         nexpr.type = IntType.from_fixed_point_type(expr.type)
         #print("type_result Prod: {}".format(nexpr.type))
+        typecheck_int_type(nexpr, nexpr.type, expr.type)
         return nexpr
     
     elif isinstance(expr, fpexprlib.FpQuotient):
@@ -132,7 +135,7 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr.lhs = mult_type_match(nexpr.lhs,nexpr.type)
         nexpr.rhs = mult_type_match(nexpr.rhs,nexpr.type)
 
-
+        typecheck_int_type(nexpr, nexpr.type, expr.type)
         return nexpr
     
     elif isinstance(expr, fpexprlib.FpReciprocal):
@@ -140,7 +143,7 @@ def fpexpr_to_intexpr(blk,expr):
 
         recip = IntReciprocal(expr = nexpr)
         recip.type = IntType.from_fixed_point_type(expr.type)
-
+        typecheck_int_type(recip, recip.type, expr.type)
         return recip
     
 
@@ -148,27 +151,38 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr = rec(expr.expr)
         neg = exprlib.Negation(nexpr)
         neg.type = IntType.from_fixed_point_type(expr.type)
+        typecheck_int_type(neg, neg.type. expr.type)
         return neg
 
     elif isinstance(expr, fpexprlib.FPToSigned):
         orig_type = expr.type
         nexpr = rec(expr.expr)
+        
         tosgn = ToSInt(expr = nexpr)
         typecheck_int_type(tosgn,tosgn.type, expr.type)
         return tosgn
 
     elif isinstance(expr, fpexprlib.FPExtendFrac):
         nexpr = rec(expr.expr)
-        xtendF = PadR(nexpr,nbits=expr.nbits,value=0)
-        typecheck_int_type(xtendF,xtendF.type, expr.type)
-        return xtendF
+        xtendF = PadR(expr=nexpr,nbits=expr.nbits,value=0)
+        expected_type = IntType.from_fixed_point_type(expr.type)
+        sexpr = mult_type_match(scale_type_match(xtendF, expected_type), expected_type)
+        print(sexpr)
+        print(xtendF.type)
+        print(xtendF.expr.type)
+        print((xtendF.expr))
+        typecheck_int_type(sexpr,sexpr.type, expr.type)
+        return sexpr
  
     elif isinstance(expr, fpexprlib.FPTruncFrac):
         nexpr = rec(expr.expr)
-        truncF = TruncR(nexpr,nbits=expr.nbits)
-        typecheck_int_type(truncF,truncF.type, expr.type)
+        truncExpr = TruncR(expr = nexpr,nbits=expr.nbits)
+
+        expected_type = IntType.from_fixed_point_type(expr.type)
+        scaledexpr = mult_type_match(scale_type_match(truncExpr, expected_type), expected_type)
+        typecheck_int_type(scaledexpr, scaledexpr.type, expr.type)
         #print("type_result TruncF: {}".format(truncF.type))
-        return truncF
+        return scaledexpr
     
     elif isinstance(expr, fpexprlib.FPToUnsigned):#added by will
         nexpr = rec(expr.expr)
@@ -208,23 +222,36 @@ def fpexpr_to_intexpr(blk,expr):
         #print('===expr===')
         #print(eexpr.type)
         #print(exint.type)
-        typecheck_int_type(exint,exint.type,expr.type)
+        expected_type = IntType.from_fixed_point_type(expr.type)
+        scaledexpr = mult_type_match(scale_type_match(exint, expected_type),expected_type)
+        typecheck_int_type(scaledexpr,scaledexpr.type,expr.type)
         return exint
     
     elif isinstance(expr, fpexprlib.FPTruncInt):
         eexpr = rec(expr.expr)
         exint = TruncVal(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
         #print("type_result TruncInt: {}".format(exint.type))
-        typecheck_int_type(exint, exint.type, expr.type)
+        expected_type = IntType.from_fixed_point_type(expr.type)
+        scaledexpr = mult_type_match(scale_type_match(exint, expected_type),expected_type)
+        typecheck_int_type(scaledexpr, scaledexpr.type, expr.type)
         
         return exint
     
     elif isinstance(expr, fpexprlib.FPTruncL):
         eexpr = rec(expr.expr)
-        exint = Trunc(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
+        exint = TruncL(expr=eexpr,nbits=eexpr.type.nbits - expr.type.nbits)
         #print("type_result TruncInt: {}".format(exint.type))
+        exint.expr = mult_type_match(scale_type_match(exint.expr, exint.type),exint.type)
         typecheck_int_type(exint, exint.type, expr.type)
-        
+        print("TruncL")
+        return exint
+    
+    elif isinstance(expr, fpexprlib.FPIncreaseScale):
+        eexpr = rec(expr.expr)
+        exint = IntIncreaseScale(expr = eexpr, nbits=expr.nbits)
+        exint.type = IntType(nbits = eexpr.type.nbits, scale = 2**(round(math.log2(eexpr.type.scale)) + expr.nbits), signed = expr.type.signed)
+        exint.expr = mult_type_match(scale_type_match(exint.expr, exint.type),exint.type)
+        typecheck_int_type(exint, exint.type, expr.type)
         return exint
     
     else:
