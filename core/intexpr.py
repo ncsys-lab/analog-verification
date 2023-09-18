@@ -37,7 +37,7 @@ class IntType(VarType):
     def matches(self,other):
         assert(isinstance(other, IntType))
         return other.nbits == self.nbits \
-                and other.scale == self.scale \
+                and float(other.scale) == float(self.scale) \
                 and other.signed == self.signed \
 
     def from_real(self,v):
@@ -121,6 +121,7 @@ class IntReciprocal(Expression):
     def execute(self, args):
 
         result =  2**self.type.nbits // self.expr.execute(args)
+        print("{} // {} = {}".format(2**self.type.nbits, self.expr.execute(args), result))
         
         tc_result = self.type.typecast_value(result)
         self.type.typecheck_value(tc_result)
@@ -177,6 +178,7 @@ class TruncR(IntOp):
     def type(self):
         typ = self.expr.type
         new_scale = typ.scale*(2**(self.nbits))
+        print(self.nbits)
         assert(self.nbits > 0)
         return IntType(nbits=typ.nbits - self.nbits, scale=new_scale, signed=typ.signed)
 

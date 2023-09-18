@@ -114,23 +114,30 @@ class AMSBlock:
         print("block {}".format(self.name))
         for r in self.relations():
             print(r.pretty_print())
+    
+    def pretty_print_types(self):
+        print("block {}".format(self.name))
+        for v in self.vars():
+            print(v)
 
 
 def execute_block(blk, args):
     vals = dict(args)
 
-    
+    print(vals)
+
     for rel in blk.relations():
 
         if isinstance(rel, VarAssign):
       
             rhs_val = rel.rhs.execute(vals)
             if(rel.lhs.name == 'dodt'):
-                print('dodt:')
-                print(rel.rhs.type)
-                print(rel.rhs.execute(vals))
-                print(rel.rhs.pretty_print())
-                print(rel.rhs.type.to_real(rhs_val))
+                obj = rel.rhs
+                print(obj.pretty_print())
+                print(obj.type)
+                print(obj.op_name)
+                print(obj.execute(vals))
+
                 
 
 
@@ -143,12 +150,14 @@ def execute_block(blk, args):
             
             if(rel.lhs.name == 'o'):
                 print('o:')
-                obj = rel.rhs.expr
-                print(obj.type.to_real(obj.execute(vals)))
-                print(obj.execute(vals))
-                print(obj.type)
-                print(obj.expr.type)
+                obj = rel.rhs.expr.expr.expr.expr.expr.rhs.expr.expr
                 print(obj.pretty_print())
+                print(obj.type)
+                print(obj.op_name)
+                print(obj.execute(vals))
+
+
+
 
                 
 

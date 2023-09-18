@@ -113,7 +113,9 @@ class RTLBlock:
             return self.traverse_expr_tree(relation.lhs)[0] * self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, IntReciprocal)):
             expression = self.traverse_expr_tree(relation.expr)
-            return   Int((2 ** expression[1]) - 1, width=expression[1])  / expression[0], relation.type.nbits
+            print(relation.type)
+            input()
+            return   Int((2 ** expression[1]), width=expression[1] + 1)  / expression[0], relation.type.nbits
         elif(isinstance(relation, Negation)): #disgusting
             if(relation.expr.type.signed == True):
                 imm_wire_debug_name = relation.op_name + "_imm_" + str(next(self.namecounter))
@@ -264,7 +266,10 @@ class RTLBlock:
                 srcex = compile(srcstring, '<String>', 'exec') #was 'eval' insted of 'exec'
                 exec(srcex)
             if v.kind == VarKind.Output:
-                returndict[v.name] = getattr(self.dut, v.name).int()
+                if(v.type.signed):
+                    returndict[v.name] = getattr(self.dut, v.name).int()
+                else:
+                    returndict[v.name] = int(getattr(self.dut, v.name))
                 
         
         self.dut.sim_tick()

@@ -55,15 +55,32 @@ def mult_type_match(e,t):
         
 def scale_type_match(e, t):
     print("potential infinite loop in scale_type_match")
-    if e.type.matches(t):
+
+    
+    if e.type.scale == t.scale:
+        print('here')
         return e
     else:
-        if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
-            nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
-            return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t)
+        if(math.log2(e.type.scale) <= 0 and math.log2(t.scale) <= 0 ):
+            print(e.type)
+            print(t)
+            input()
+            if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
+                nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
+                return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t)
+            else:
+                nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
+                return scale_type_match(TruncR(nbits = nbits, expr = e), t )
         else:
-            nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
-            return scale_type_match(TruncR(nbits = nbits, expr = e), t )
+            print(e.type)
+            print(t)
+            input()
+            if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
+                nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
+                return scale_type_match(TruncR(nbits = nbits, expr = e), t)
+            else:
+                nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
+                return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t )
 
 
 
@@ -143,6 +160,8 @@ def fpexpr_to_intexpr(blk,expr):
 
         recip = IntReciprocal(expr = nexpr)
         recip.type = IntType.from_fixed_point_type(expr.type)
+        print(recip.type)
+        
         typecheck_int_type(recip, recip.type, expr.type)
         return recip
     
@@ -267,12 +286,14 @@ def decl_relations(int_blk,fp_block):
     for rel in fp_block.relations():
         if isinstance(rel, exprlib.VarAssign):
             newlhs = fpexpr_to_intexpr(int_blk, rel.lhs)
-            newrhs = fpexpr_to_intexpr(int_blk, rel.rhs)
+            #print(IntType.from_fixed_point_type(rel.lhs.type))
+            desired_type = IntType.from_fixed_point_type(rel.lhs.type)
+            newrhs = mult_type_match(scale_type_match(fpexpr_to_intexpr(int_blk, rel.rhs), desired_type), desired_type)
             int_blk.decl_relation(exprlib.VarAssign(newlhs, newrhs))
 
         elif isinstance(rel, exprlib.Accumulate):
             newlhs = fpexpr_to_intexpr(int_blk, rel.lhs)
-            newrhs = fpexpr_to_intexpr(int_blk, rel.rhs)
+            newrhs = scale_type_match(fpexpr_to_intexpr(int_blk, rel.rhs), IntType.from_fixed_point_type(rel.lhs.type))
             int_blk.decl_relation(exprlib.Accumulate(newlhs, newrhs))
 
         else:
