@@ -42,15 +42,15 @@ class ModelParams:
         return VREF * VREF_to_response_time + VREG * VREG_to_response_time + const_to_response_time
 
     def compute_low_high_tau(self, block, VREF, VREG):
-        VREF_to_tau = block.decl_param( ('VREF_to_tau'), Constant(self.low_high_paramdict_tau['VREF_to_tau'] ) ) 
-        VREG_to_tau = block.decl_param( ('VREG_to_tau'), Constant(self.low_high_paramdict_tau['VREG_to_tau'] ) ) 
-        const_tau   = block.decl_param( ('const_tau'  ), Constant(self.low_high_paramdict_tau['const_tau'  ] ) )
+        VREF_to_tau = block.decl_param( ('VREF_to_tau_lh'), Constant(self.low_high_paramdict_tau['VREF_to_tau'] ) ) 
+        VREG_to_tau = block.decl_param( ('VREG_to_tau_lh'), Constant(self.low_high_paramdict_tau['VREG_to_tau'] ) ) 
+        const_tau   = block.decl_param( ('const_tau_lh'  ), Constant(self.low_high_paramdict_tau['const_tau'  ] ) )
         return VREF * VREF_to_tau + VREG * VREG_to_tau + const_tau
 
     def compute_low_high_response_time(self, block, VREF, VREG):
-        VREF_to_response_time = block.decl_param( ('VREF_to_response_time'), Constant(self.low_high_paramdict_resptime['VREF_to_response_time'] ) )
-        VREG_to_response_time = block.decl_param( ('VREG_to_response_time'), Constant(self.low_high_paramdict_resptime['VREG_to_response_time'] ) )
-        const_response_time   = block.decl_param( ('const_response_time'  ), Constant(self.low_high_paramdict_resptime['const_response_time'  ] ) )
+        VREF_to_response_time = block.decl_param( ('VREF_to_response_time_lh'), Constant(self.low_high_paramdict_resptime['VREF_to_response_time'] ) )
+        VREG_to_response_time = block.decl_param( ('VREG_to_response_time_lh'), Constant(self.low_high_paramdict_resptime['VREG_to_response_time'] ) )
+        const_response_time   = block.decl_param( ('const_response_time_lh'  ), Constant(self.low_high_paramdict_resptime['const_response_time'  ] ) )
         return VREF * VREF_to_response_time + VREG * VREG_to_response_time + const_response_time
     
 
@@ -115,11 +115,11 @@ class StateMaker:
         #print("HEREHEREHERE")
         #print(tau.type)
         dodt = evaluate_wait_high_low.block.decl_var("dvdt", kind=VarKind.Transient,  \
-            type=intervallib.real_type_from_expr(evaluate_wait_high_low.block, - o / tau, rel_prec=0.01))
+            type=intervallib.real_type_from_expr(evaluate_wait_high_low.block, - o * Reciprocal(tau), rel_prec=0.01))
 
         evaluate_wait_high_low.block.decl_relation(VarAssign(tau,tau_exp))
         evaluate_wait_high_low.block.decl_relation(VarAssign(out,o))
-        evaluate_wait_high_low.block.decl_relation(VarAssign(dodt, - o / tau))
+        evaluate_wait_high_low.block.decl_relation(VarAssign(dodt, - o * Reciprocal(tau)))
         evaluate_wait_high_low.block.decl_relation(Integrate(o, dodt, timestep=timestep))
 
         ival_reg = intervallib.compute_intervals_for_block(evaluate_wait_high_low.block,rel_prec=0.01)
@@ -132,11 +132,11 @@ class StateMaker:
         o    = evaluate_wait_low_high.block.decl_var('o',  VarKind.StateVar, RealType(0, 3.3, 0.1))  
         out  = evaluate_wait_low_high.block.decl_var('out',  VarKind.Output, o.type)
 
-        wait_time_exp = StateMaker.model_params.compute_low_high_response_time(evaluate_wait_low_high.block, vref, vreg)
-        wait_time = evaluate_wait_low_high.block.decl_var('wait_time', VarKind.Transient, \
-                                                          type=intervallib.real_type_from_expr(evaluate_wait_low_high.block, wait_time_exp, rel_prec = 0.01))
+        wait_time_exp_lh = StateMaker.model_params.compute_low_high_response_time(evaluate_wait_low_high.block, vref, vreg)
+        wait_time_lh = evaluate_wait_low_high.block.decl_var('wait_time_lh', VarKind.Transient, \
+                                                          type=intervallib.real_type_from_expr(evaluate_wait_low_high.block, wait_time_exp_lh, rel_prec = 0.01))
         
-        evaluate_wait_low_high.block.decl_relation(VarAssign(wait_time, wait_time_exp))
+        evaluate_wait_low_high.block.decl_relation(VarAssign(wait_time_lh, wait_time_exp_lh))
         
         evaluate_wait_low_high.block.decl_relation(VarAssign(o, Constant(3.3)))
         evaluate_wait_low_high.block.decl_relation(VarAssign(out,o))
@@ -154,12 +154,12 @@ class StateMaker:
 
         tau_exp = StateMaker.model_params.compute_low_high_tau( evaluate_low_low_high.block, vref, vreg )
 
-        tau = evaluate_low_low_high.block.decl_var('tau', VarKind.Transient, \
-                                                   type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.0001))
+        tau = evaluate_low_low_high.block.decl_var('tau_lh', VarKind.Transient, \
+                                                   type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.01))
         
         dodt_expr = (Constant(3.3) - o) * Reciprocal( tau )
         dodt = evaluate_low_low_high.block.decl_var('dodt', kind=VarKind.Transient, \
-                                                     type=intervallib.real_type_from_expr(evaluate_low_low_high.block,dodt_expr, rel_prec=0.00001)) #Changed precision
+                                                     type=intervallib.real_type_from_expr(evaluate_low_low_high.block,dodt_expr, rel_prec=0.01)) #Changed precision
 
         evaluate_low_low_high.block.decl_relation(VarAssign(tau, tau_exp))
         evaluate_low_low_high.block.decl_relation(VarAssign(out, o))
@@ -171,8 +171,8 @@ class StateMaker:
     
 
 
-SIM_TICKS     = 400
-TICK_DIVISION = 100000
+SIM_TICKS     = 800
+TICK_DIVISION = 200000
 SYSTEM_CLOCK = 1e-6
 
 
@@ -195,7 +195,7 @@ evaluate_wait_hl_to_evaluate_lhl = Edge(evaluate_wait_high_low, evaluate_low_hig
 #[precharge] -posedge clk-> [evaluate_wait] -duration-> [evaluate_low] -negedge clk-> [evalate_wait]
 evaluate_lhl_to_wait_llh = Edge(evaluate_low_high_low, evaluate_wait_low_high, ClockCondition(ClockCondition.Transition.NEGEDGE))
 #[precharge] -posedge clk-> [evaluate_wait] -duration-> [evaluate_low] -negedge clk-> [evalate_wait] -duration-> [evaluate_low_high]
-evaluate_wait_llh_to_evaluate_llh = Edge(evaluate_wait_low_high, evaluate_low_low_high, AnalogTimeCondition(evaluate_wait_low_high.block.get_var('wait_time')))
+evaluate_wait_llh_to_evaluate_llh = Edge(evaluate_wait_low_high, evaluate_low_low_high, AnalogTimeCondition(evaluate_wait_low_high.block.get_var('wait_time_lh')))
 #[precharge] -posedge clk-> [evaluate_wait] -duration-> [evaluate_low] -negedge clk-> [evalate_wait] -duration-> [evaluate_low_high] -signal  < 'o'-> [precharge]
 evaluate_llh_to_precharge = Edge(evaluate_low_low_high, precharge, AnalogSignalCondition('out', ( 3.29, float('inf') ) ) )
 
@@ -298,19 +298,23 @@ fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_low_high.block)
 fp_block.pretty_print_relations()
 
 int_block = intlib.to_integer(fp_block)
-validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
+#validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 int_block.pretty_print_relations()
 int_block.pretty_print_types()
-input()
+
 
 rtl_block = rtllib.RTLBlock(int_block,{'o':0})
 
 rtl_block.generate_verilog_src("./core/")
 rtl_block.generate_pymtl_wrapper()
 rtl_block.pymtl_sim_begin()
-validate_pymtl_model(rtl_block, SYSTEM_CLOCK/TICK_DIVISION, "rtl_dynamics.png")
+#validate_pymtl_model(rtl_block, SYSTEM_CLOCK/TICK_DIVISION, "rtl_dynamics.png")
 
 
 
-comparator_latch_fsm.optimizeHierarchy()
+comparator_latch_fsm.preprocessHierarchy()
+rtl_fsm = rtllib.RTLBlock(comparator_latch_fsm,{'o':0})
+rtl_fsm.generate_verilog_src("./core/")
+
+
 

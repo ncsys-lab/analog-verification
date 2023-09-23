@@ -156,13 +156,6 @@ def execute_block(blk, args):
                 print(obj.op_name)
                 print(obj.execute(vals))
 
-
-
-
-                
-
-
-                
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
 
         else:

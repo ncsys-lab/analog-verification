@@ -64,7 +64,6 @@ def scale_type_match(e, t):
         if(math.log2(e.type.scale) <= 0 and math.log2(t.scale) <= 0 ):
             print(e.type)
             print(t)
-            input()
             if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
                 nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
                 return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t)
@@ -74,7 +73,6 @@ def scale_type_match(e, t):
         else:
             print(e.type)
             print(t)
-            input()
             if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
                 nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
                 return scale_type_match(TruncR(nbits = nbits, expr = e), t)
@@ -170,7 +168,9 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr = rec(expr.expr)
         neg = exprlib.Negation(nexpr)
         neg.type = IntType.from_fixed_point_type(expr.type)
-        typecheck_int_type(neg, neg.type. expr.type)
+        print(expr)
+        
+
         return neg
 
     elif isinstance(expr, fpexprlib.FPToSigned):

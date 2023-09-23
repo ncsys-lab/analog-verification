@@ -136,7 +136,6 @@ def expr_type_match(lhse, rhse):
 
 def mult_type_match(e, t):
     print("mult_type_match")
-    input()
 
     return FPTruncL(expr=e, nbits= e.type.nbits - t.nbits)
 
@@ -290,7 +289,7 @@ def fixed_point_block(reg,block):
             print(eq_expr.rhs.pretty_print())
             print(eq_expr.lhs.type)
             print(eq_expr.rhs.type)
-            input()
+
             fp_block.decl_relation(eq_expr)
         elif isinstance(rel, exprlib.Integrate):
             int_expr = fixed_point_expr(reg,rel)

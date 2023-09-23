@@ -3,7 +3,6 @@ from core.block import *
 from core.expr import *
 from copy import *
 import core.fixedpoint as fixlib
-import core.rtl as rtllib
 import core.integer as intlib
 import core.intervals as intervallib
 
@@ -30,7 +29,7 @@ class FSMAMSBlock:
         self.name = name
         self._vars = {}
         self._params = {}
-        self._relations = []
+        self._relations_dict = {}
 
     def vars(self):
         return self._vars.values()
@@ -95,20 +94,45 @@ class FSMAMSBlock:
                 self.event_this_cycle = None
                 return
             
-    def optimizeHierarchy(self):
-        for name, node in self.nodes.items(): #iterate through all blocks in the FSM and convert to integer model
-            print(node)
-            node.ival_reg = intervallib.compute_intervals_for_block(node.block, rel_prec = 0.01)
-            fp_block = fixlib.to_fixed_point(node.ival_reg,node.block)
-            for v in fp_block.vars():
-                print(v)
+    def preprocessHierarchy(self, rel_prec = 0.01):
+        for name, node in self.nodes.items(): #Find Largest Range for each state var and store that.
 
-            node.int_block = intlib.to_integer(fp_block)
+            for v in node.block.vars():
+                if( not ( v.name in list(map(lambda vec: vec.name, self._vars.values())) ) ):
+                    self._vars[v.name] = v
+                    
+                else:
+                    stored_var = self._vars[v.name]
+                    self._vars[v.name] = VarInfo(name=v.name, kind=v.kind, type = RealType( min(v.type.lower, v.type.upper), max(v.type.upper, stored_var.type.upper), min(v.type.prec, v.type.prec) ))
+                    node.block._vars[v.name] = deepcopy(self._vars[v.name])
 
+        for name, v in self._vars.items():
+            for node in self.nodes.values():
+                if v in node.block.vars():
+                    if node.block._vars[name] != v:
+                        node.block._vars[name] = v
+
+        for name, node in self.nodes.items(): #iterate through all blocks in the FSM and convert to integer model, extracting relations.
+            ival_reg = intervallib.compute_intervals_for_block(node.block, rel_prec)
+            fp_block = fixlib.to_fixed_point(ival_reg,node.block)
+
+            int_block = intlib.to_integer(fp_block)
+            node.block = int_block
+
+            self._relations_dict[name] = int_block.relations()
+
+            for v in node.block.vars():
+                self._vars[v.name] = v
+            
+            for p in node.block.params():
+                self._params[p.name] = p
 
         
-        
-        
+
+
+
+            
+
 
     def _conditionTrue(self, cond):
         if(isinstance(cond, ClockCondition)):

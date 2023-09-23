@@ -11,6 +11,7 @@ from dill.source import getsource
 from pymtl3.stdlib.test_utils import mk_test_case_table, run_sim, config_model_with_cmdline_opts
 import math
 import inspect
+from core.fsmblock import *
 
 class RTLBlock:
 
@@ -51,23 +52,55 @@ class RTLBlock:
 
         self.seq = Seq(self.m, 'regassn', self.inputs['eval_clk'], self.inputs['reset'])
 
+        if( isinstance(block, AMSBlock)):
+            for r in block.relations():
+                if r.lhs.name in self.regs.keys():
+                    if(isinstance(r,Accumulate)):
+                        expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
+                    else:
+                        expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
 
-        for r in block.relations():
-            if r.lhs.name in self.regs.keys():
-                if(isinstance(r,Accumulate)):
-                    expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
-                else:
-                    expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+                    self.seq.If(self.inputs['reset'])(
+                        self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type)) 
+                    ).Else(
+                        expression
+                    )
+                elif r.lhs.name in self.wires.keys():
+                    self.wires[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
+                elif r.lhs.name in self.outputs.keys():
+                    self.outputs[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
+        elif( isinstance(block, FSMAMSBlock)):
+            
+            state_mapping = dict(zip( block.edges.keys(), range(len(block.edges.keys())) ))
+            print(state_mapping)
+            input()
+            state_defined = []
+            fsm = FSM(self.m, 'fsm', self.inputs['eval_clk'], self.inputs['reset'])
 
-                self.seq.If(self.inputs['reset'])(
-                    self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type)) 
-                ).Else(
-                    expression
-                )
-            elif r.lhs.name in self.wires.keys():
-                self.wires[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
-            elif r.lhs.name in self.outputs.keys():
-                self.outputs[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
+            for state_name, edge in self.block.edges.items():
+                if(not (state_name in state_defined) ):
+                    for r in self.block.nodes[state_name].block.relations():
+                        if r.lhs.name in self.regs.keys():
+                            if(isinstance(r,Accumulate)):
+                                expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
+                            else:
+                                expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+
+                            fsm.add(If(self.inputs['reset'])(
+                                self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type))
+                            ).Else(
+                                expression
+                            ),index = state_mapping[state_name])
+                        elif r.lhs.name in self.wires.keys():
+                            print(self.wires[r.lhs.name])
+                            fsm.add(self.wires[r.lhs.name](self.traverse_expr_tree(r.rhs)[0]), index = state_mapping[state_name])
+                        elif r.lhs.name in self.outputs.keys():
+                            fsm.add(self.outputs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0]), index = state_mapping[state_name])
+                state_defined.append(state_name)
+                print(edge)
+                fsm.goto_from(state_mapping[state_name], state_mapping[edge[0].dest_node.name])
+
+
     
     def print_verilog_src(self):
         v = self.m.to_verilog()
@@ -113,8 +146,8 @@ class RTLBlock:
             return self.traverse_expr_tree(relation.lhs)[0] * self.traverse_expr_tree(relation.rhs)[0], relation.type.nbits
         elif(isinstance(relation, IntReciprocal)):
             expression = self.traverse_expr_tree(relation.expr)
-            print(relation.type)
-            input()
+
+
             return   Int((2 ** expression[1]), width=expression[1] + 1)  / expression[0], relation.type.nbits
         elif(isinstance(relation, Negation)): #disgusting
             if(relation.expr.type.signed == True):
