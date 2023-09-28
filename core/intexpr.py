@@ -71,6 +71,9 @@ class IntType(VarType):
         assert(isinstance(v,int))
         assert(v <= self.upper)
         assert(v >= self.lower)
+    
+    def __post_init__(self):
+        assert self.nbits > 0
 
 
 

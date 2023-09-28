@@ -32,8 +32,18 @@ class RTLBlock:
         self.initconditions = initconditions
 
         self.inputs['clk'] = self.m.Input('sys_clk')#kludge for pymtl sim to be on eval_clk
-        self.inputs['eval_clk'] = self.m.Input('clk')#
+        self.inputs['eval_clk'] = self.m.Input('clk')
         self.inputs['reset'] = self.m.Input('reset')
+
+        self.seq = Seq(self.m, 'regassn', self.inputs['eval_clk'], self.inputs['reset'])
+
+        if(isinstance(self.block, FSMAMSBlock)):
+            self.regs['state_cycle_counter'] = self.m.Reg('state_cycle_counter', ceil(math.log2(10 * block.evaluate_dt_division))) #scales size based on clockdivision
+
+            self.regs['prev_clk'] = self.m.Reg('prev_sys_clk', 1)
+
+            self.seq(self.regs['prev_clk'](self.inputs['clk']))
+
 
         self.namecounter = count()
 
@@ -50,7 +60,7 @@ class RTLBlock:
         for p in block.params():
             self.params[p.name] = self.m.Parameter(p.name, self.scale_value_to_int(p.constant.value, p.constant.type) )
 
-        self.seq = Seq(self.m, 'regassn', self.inputs['eval_clk'], self.inputs['reset'])
+        
 
         if( isinstance(block, AMSBlock)):
             for r in block.relations():
@@ -73,35 +83,86 @@ class RTLBlock:
             
             state_mapping = dict(zip( block.edges.keys(), range(len(block.edges.keys())) ))
             print(state_mapping)
-            input()
+
             state_defined = []
             fsm = FSM(self.m, 'fsm', self.inputs['eval_clk'], self.inputs['reset'])
+            self.fsm = fsm
 
-            for state_name, edge in self.block.edges.items():
-                if(not (state_name in state_defined) ):
-                    for r in self.block.nodes[state_name].block.relations():
-                        if r.lhs.name in self.regs.keys():
-                            if(isinstance(r,Accumulate)):
-                                expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
-                            else:
-                                expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+            for state_name, edges in self.block.edges.items():
+                print((edges))
 
-                            fsm.add(If(self.inputs['reset'])(
-                                self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type))
-                            ).Else(
-                                expression
-                            ),index = state_mapping[state_name])
-                        elif r.lhs.name in self.wires.keys():
-                            print(self.wires[r.lhs.name])
-                            fsm.add(self.wires[r.lhs.name](self.traverse_expr_tree(r.rhs)[0]), index = state_mapping[state_name])
-                        elif r.lhs.name in self.outputs.keys():
-                            fsm.add(self.outputs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0]), index = state_mapping[state_name])
-                state_defined.append(state_name)
-                print(edge)
-                fsm.goto_from(state_mapping[state_name], state_mapping[edge[0].dest_node.name])
+                for edge in edges:
+                    if(not (state_name in state_defined) ):
+                        print(self.block.nodes[state_name].block.relations())
+
+                        for r in self.block.nodes[state_name].block.relations():
+                            print(r.lhs.type)
+                            print(r.rhs.type)
+                            print(r.pretty_print())
+
+                            if r.lhs.name in self.regs.keys():
+                                if(isinstance(r,Accumulate)):
+                                    expression = self.regs[r.lhs.name]( self.regs[r.lhs.name] + self.traverse_expr_tree(r.rhs)[0])
+                                else:
+                                    expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
+
+                                fsm.add(If(self.inputs['reset'])(
+                                    self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type))
+                                ).Else(
+                                    expression
+                                ),index = state_mapping[state_name])
+                            elif r.lhs.name in self.wires.keys():
+                                print(self.wires[r.lhs.name])
+                                self.wires[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
+                            elif r.lhs.name in self.outputs.keys():
+                                try:
+                                    self.outputs[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
+                                except:
+                                    pass
+                
+                    state_defined.append(state_name)
+                    print(edge)
+                    fsm.goto_from(state_mapping[state_name], state_mapping[edge.dest_node.name], cond=self.extract_condition(edge.cond, state_mapping[state_name]))
+
+    def extract_condition(self, condition, state_index):
+        if( isinstance(condition, NoCondition)):
+            return None
+        elif( isinstance(condition, AnalogTimeCondition) ):
+            print(condition.duration_var)
+            eq = self.regs['state_cycle_counter'] > self.wires[condition.duration_var.name]
+            self.fsm.add(If(eq)(self.regs['state_cycle_counter'](0)).Else(self.regs['state_cycle_counter'](self.regs['state_cycle_counter'] + 1)), index = state_index )
+            return eq
+        elif( isinstance(condition, ClockCondition)):
+            if(condition.transition_type == ClockCondition.Transition.POSEDGE):
+                if not isinstance(condition.extra_cond, NoCondition):
+                    return And(And(Unot(self.regs['prev_clk']), self.inputs['clk']), self.extract_condition(condition.extra_cond, state_index))
+                else:
+                    return And(Unot(self.regs['prev_clk']), self.inputs['clk'])
+            if (condition.transition_type == ClockCondition.Transition.NEGEDGE):
+                if not isinstance(condition.extra_cond, NoCondition):
+                    return And(And(self.regs['prev_clk'], Unot(self.inputs['clk'])), self.extract_condition(condition.extra_cond, state_index))
+                else:
+                    return And(self.regs['prev_clk'], Unot(self.inputs['clk']))
+                
+        elif( isinstance(condition, AnalogSignalCondition)):
+            if(condition.expr in self.regs.keys()):
+                var = self.regs[condition.expr]
+            elif(condition.expr in self.wires.keys()):
+                var = self.wires[condition.expr]
+            else:
+                var = self.inputs[condition.expr]
+
+            print(self.block._vars[condition.expr].type.nbits)
+
+            lb = Int(self.scale_value_to_int(condition.range[0], self.block._vars[condition.expr].type), width=self.block._vars[condition.expr].type.nbits)
+            ub = Int(self.scale_value_to_int(condition.range[1], self.block._vars[condition.expr].type), width=self.block._vars[condition.expr].type.nbits)
+            return And((var > lb),(var <= ub))
+                
+        else:
+            print('[WARN] State transition condition may be unimplemented')
+            return None
 
 
-    
     def print_verilog_src(self):
         v = self.m.to_verilog()
         print(v)
@@ -114,7 +175,21 @@ class RTLBlock:
             print(type)
             raise Exception('wrong type')
         #print(math.trunc(value / type.scale))
-        return math.trunc(value / type.scale)
+        if(value == float('inf')):
+            return  2 ** (type.nbits - 1)
+        elif(value == float('-inf')):
+            return - 2 ** (type.nbits - 1)
+        else:
+            return math.trunc(value / type.scale)
+        
+    def scale_value_to_real(self, value, type):
+        if not isinstance(type, IntType):
+            print(type)
+            raise Exception('wrong type')
+        #print(math.trunc(value / type.scale))
+        else:
+            return  value * type.scale
+
 
 
     #This function pretty much traverses our expression tree and turns it into a veriloggen expression tree
@@ -173,24 +248,34 @@ class RTLBlock:
         elif(isinstance(relation, TruncR)):
             #You can't truncate epressions, only wires in verilog, so you need to create an intermediate wire
             
-            if(False): #kludge
-                sext_name = 'sextOp' + '_' + str(next(self.namecounter))
-                print(relation.expr)
-                self.wires[sext_name] = self.m.Wire( sext_name, relation.expr.type.nbits)
-                self.wires[sext_name].assign(self.traverse_expr_tree(relation.expr)[0])
-
-
-                wire_name = relation.op_name + "_" + str(next(self.namecounter))
-                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
-                self.wires[wire_name].assign(Cat( Repeat(self.wires[sext_name][relation.type.nbits],relation.type.nbits), self.wires[sext_name]))
-            else:
+            if(relation.type.signed): #kludge
                 wire_name = relation.op_name + "_" + str(next(self.namecounter))
                 self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
                 self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
 
-            
+                wire_name_shift = relation.op_name + "_shift_" + str(next(self.namecounter))
+                self.wires[wire_name_shift] = self.m.Wire(wire_name_shift, relation.type.nbits)
+                self.wires[wire_name_shift].assign(Sra(self.wires[wire_name],relation.nbits))
 
-            return (self.wires[wire_name][relation.expr.type.nbits - relation.type.nbits:]), relation.type.nbits
+                wire_name_imm = relation.op_name + "_imm_" + str(next(self.namecounter))
+                self.wires[wire_name_imm] = self.m.Wire(wire_name_imm, relation.type.nbits)
+                
+                print(relation.pretty_print())
+                print(relation.nbits)
+                input()
+                self.wires[wire_name_imm].assign( 
+                    Mux(self.wires[wire_name][-1], 
+                        self.wires[wire_name_shift][:relation.expr.type.nbits - relation.nbits], 
+                        self.wires[wire_name][relation.nbits:]))
+                
+
+                return self.wires[wire_name_imm], relation.type.nbits
+            
+            else:
+                wire_name = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
+                self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
+                return (self.wires[wire_name][relation.type.nbits:]), relation.type.nbits
         elif(isinstance(relation, ToUSInt)):
             
             if(not relation.expr.type.signed):
@@ -223,6 +308,7 @@ class RTLBlock:
             self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
             return (self.wires[wire_name][:relation.expr.type.nbits - relation.nbits]), relation.type.nbits
         elif(isinstance(relation, PadR)):
+            
             padr_wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[padr_wire_name] = self.m.Wire(padr_wire_name, relation.type.nbits)
 
@@ -271,6 +357,7 @@ class RTLBlock:
 
         funcobj = FunctionType(code, globals(), "construct", argdefs=param_tuple) #Used https://gist.github.com/dhagrow/d3414e3c6ae25dfa606238355aea2ca5
 
+
         self.pymtl_object_class = type( self.name, (VerilogPlaceholder, Component), {"construct" : funcobj})
     
     def pymtl_sim_begin(self):
@@ -296,6 +383,7 @@ class RTLBlock:
                 #srcstring = 'print(inputs[\'{}\'])'.format(v.name)
                 #print(srcstring)
                 #print(srcstring)
+
                 srcex = compile(srcstring, '<String>', 'exec') #was 'eval' insted of 'exec'
                 exec(srcex)
             if v.kind == VarKind.Output:
@@ -303,6 +391,8 @@ class RTLBlock:
                     returndict[v.name] = getattr(self.dut, v.name).int()
                 else:
                     returndict[v.name] = int(getattr(self.dut, v.name))
+        
+        self.dut.sys_clk @= inputs['sys_clk']
                 
         
         self.dut.sim_tick()

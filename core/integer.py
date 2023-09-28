@@ -48,9 +48,11 @@ def mult_type_match(e,t):
     else:
         if(e.type.nbits < t.nbits):
             nbits = t.nbits - e.type.nbits
+            assert nbits > 0
             return mult_type_match(PadL(nbits = nbits, expr = e, value=0), t)
         else:
             nbits = e.type.nbits - t.nbits
+            assert nbits > 0
             return mult_type_match(TruncVal(nbits = nbits, expr = e), t)
         
 def scale_type_match(e, t):
@@ -66,19 +68,38 @@ def scale_type_match(e, t):
             print(t)
             if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
                 nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
+                assert nbits > 0
                 return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t)
             else:
                 nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
+                assert nbits > 0
                 return scale_type_match(TruncR(nbits = nbits, expr = e), t )
-        else:
+        elif(math.log2(e.type.scale) > 0 and math.log2(t.scale) > 0 ):
             print(e.type)
             print(t)
             if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
                 nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
+                assert nbits > 0
                 return scale_type_match(TruncR(nbits = nbits, expr = e), t)
             else:
                 nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
+                assert nbits > 0
                 return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t )
+        else:
+            if( math.log2(e.type.scale) < math.log2(t.scale)):
+                nbits = round(math.log2(t.scale)) - round(math.log2(e.type.scale))
+                assert nbits > 0
+                if(nbits > 0):
+                    return scale_type_match(TruncR(nbits=nbits, expr = e), t)
+                else:
+                    return scale_type_match(PadR(nbits=-nbits, expr = e, value = 0), t)
+            else:
+                nbits = round(math.log2(e.type.scale)) - round(math.log2(t.scale))
+                assert nbits > 0
+                if(nbits > 0):
+                    return scale_type_match(PadR(nbits=nbits, expr = e, value = 0), t)
+                else:
+                    return scale_type_match(TruncR(nbits=-nbits, expr = e), t)
 
 
 
@@ -168,7 +189,9 @@ def fpexpr_to_intexpr(blk,expr):
         nexpr = rec(expr.expr)
         neg = exprlib.Negation(nexpr)
         neg.type = IntType.from_fixed_point_type(expr.type)
+        print(neg.type)
         print(expr)
+        input()
         
 
         return neg
@@ -306,6 +329,7 @@ def to_integer(fp_block):
     int_blk = blocklib.AMSBlock(fp_block.name+'-int')
 
     for v in fp_block.vars():
+
         typ = IntType.from_fixed_point_type(v.type)
         int_blk.decl_var(name=v.name, kind=v.kind, type=typ)
     

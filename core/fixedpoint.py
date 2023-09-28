@@ -221,13 +221,17 @@ def fixed_point_expr(reg,expr):
 
     elif isinstance(expr, exprlib.Negation):
         new_expr = rec(expr.expr)
-        if not new_expr.type.signed:
-            neg_expr = exprlib.Negation(FPToSigned(new_expr))
 
+        targ_type = reg.get_type(expr.ident)
 
-        else:
-            neg_expr = exprlib.Negation(new_expr)
-        neg_expr.type = reg.get_type(expr.ident)
+        tm_expr = type_match(new_expr, targ_type)
+        neg_expr = exprlib.Negation(tm_expr)
+
+        neg_expr.type = targ_type
+        print(expr)
+        print(neg_expr.type)
+        input()
+
         return neg_expr
 
     elif isinstance(expr, exprlib.Var):
@@ -270,6 +274,9 @@ def fixed_point_var(reg,var):
 def fixed_point_block(reg,block):
     fp_block = blocklib.AMSBlock(block.name + "_fp")
     for v in block.vars():
+        print(v.name)
+        print(v.type)
+        input()
         typ = fixed_point_var(reg,v)
         fp_block.decl_var(name=v.name, type=typ, kind=v.kind)
 

@@ -125,36 +125,31 @@ def execute_block(blk, args):
     vals = dict(args)
 
     print(vals)
-
+    
     for rel in blk.relations():
+
+
+        if(rel.lhs.name == 'o'):
+            obj = rel.rhs
+            
+            # print("{} + {}".format(vals[rel.lhs.name], rel.rhs.type.to_real(rel.rhs.execute(vals))))
+            # print(obj.type.to_real(obj.execute(vals)))
+            # print(obj.type)
+            # print(obj.expr.type)
+            # print(obj.pretty_print())
+
 
         if isinstance(rel, VarAssign):
       
             rhs_val = rel.rhs.execute(vals)
-            if(rel.lhs.name == 'dodt'):
-                obj = rel.rhs
-                print(obj.pretty_print())
-                print(obj.type)
-                print(obj.op_name)
-                print(obj.execute(vals))
-
-                
-
 
             vals[rel.lhs.name] = rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Integrate):
             rhs_val = rel.rhs.execute(vals)
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
         elif isinstance(rel,Accumulate):
+
             rhs_val = rel.rhs.execute(vals)
-            
-            if(rel.lhs.name == 'o'):
-                print('o:')
-                obj = rel.rhs.expr.expr.expr.expr.expr.rhs.expr.expr
-                print(obj.pretty_print())
-                print(obj.type)
-                print(obj.op_name)
-                print(obj.execute(vals))
 
             vals[rel.lhs.name] += rel.rhs.type.to_real(rhs_val)
 

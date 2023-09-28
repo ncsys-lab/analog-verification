@@ -5,6 +5,7 @@ from copy import *
 import core.fixedpoint as fixlib
 import core.integer as intlib
 import core.intervals as intervallib
+from core.intexpr import *
 
 class FSMAMSBlock:
 
@@ -16,6 +17,8 @@ class FSMAMSBlock:
 
         self.system_dt   = system_dt
         self.evaluate_dt = system_dt / evaluate_dt_division
+        print(self.evaluate_dt)
+        input()
         self.evaluate_dt_division = evaluate_dt_division #must be even for posedge and negedge
 
         self.evaluate_cycles = 0
@@ -25,7 +28,7 @@ class FSMAMSBlock:
 
         self.event_this_cycle = None
 
-        #stuff to appear like it has the same variable interface as the standard AMSBlock. Definitely due for a refactor
+        #stuff to appear like it has the same variable interface as the standard AMSBlock.
         self.name = name
         self._vars = {}
         self._params = {}
@@ -37,6 +40,8 @@ class FSMAMSBlock:
     def params(self):
         return self._params.values()
         
+    def get_var(self, v):
+        return self._vars[v]
     
     def addNode(self, node):
         assert not (node.name in self.nodes.keys())
@@ -95,22 +100,6 @@ class FSMAMSBlock:
                 return
             
     def preprocessHierarchy(self, rel_prec = 0.01):
-        for name, node in self.nodes.items(): #Find Largest Range for each state var and store that.
-
-            for v in node.block.vars():
-                if( not ( v.name in list(map(lambda vec: vec.name, self._vars.values())) ) ):
-                    self._vars[v.name] = v
-                    
-                else:
-                    stored_var = self._vars[v.name]
-                    self._vars[v.name] = VarInfo(name=v.name, kind=v.kind, type = RealType( min(v.type.lower, v.type.upper), max(v.type.upper, stored_var.type.upper), min(v.type.prec, v.type.prec) ))
-                    node.block._vars[v.name] = deepcopy(self._vars[v.name])
-
-        for name, v in self._vars.items():
-            for node in self.nodes.values():
-                if v in node.block.vars():
-                    if node.block._vars[name] != v:
-                        node.block._vars[name] = v
 
         for name, node in self.nodes.items(): #iterate through all blocks in the FSM and convert to integer model, extracting relations.
             ival_reg = intervallib.compute_intervals_for_block(node.block, rel_prec)
@@ -119,19 +108,143 @@ class FSMAMSBlock:
             int_block = intlib.to_integer(fp_block)
             node.block = int_block
 
-            self._relations_dict[name] = int_block.relations()
-
             for v in node.block.vars():
-                self._vars[v.name] = v
+                if( not ( v.name in list(map(lambda vec: vec.name, self._vars.values())) ) ):
+                    self._vars[v.name] = v
+                    
+                else:
+                    stored_var = self._vars[v.name]
+                    if(stored_var.type.scale > v.type.scale):
+                        shift = round(math.log2(stored_var.type.scale)) - round(math.log2(v.type.scale))
+                        print(shift)
+                        if(shift > 0):
+                            self._vars[v.name] = VarInfo(name=v.name, kind=v.kind, type = intlib.IntType(nbits = stored_var.type.nbits + shift, scale = v.type.scale, signed = stored_var.type.signed or v.type.signed))
+                        else:
+                            print('SHIFT NEGATIVE')
+                            print(shift)
+                            print(stored_var.type.nbits + shift)
+                            input()
+                            self._vars[v.name] = VarInfo(name=v.name, kind=v.kind, type = intlib.IntType(nbits = stored_var.type.nbits + shift, scale = v.type.scale, signed = stored_var.type.signed or v.type.signed))
+
+                        print('NEW RANGE for {}'.format(v.name))
+                        print(2 ** self._vars[v.name].type.nbits * self._vars[v.name].type.scale)
+                        input()
+                    elif(stored_var.type.nbits < v.type.nbits ):
+                        self._vars[v.name] = VarInfo(name=v.name, kind=v.kind, type = intlib.IntType(nbits = v.type.nbits, scale = v.type.scale, signed = stored_var.type.signed or v.type.signed))
+
+
+                    node.block._vars[v.name] = deepcopy(self._vars[v.name])
+        
+        for name, fsm_v in self._vars.items():
+            for node in self.nodes.values():
+                if name in node.block._vars.keys():
+                        print('assigned new type')
+                        node.block._vars[name] = deepcopy(fsm_v)
+        
+        for name, node in self.nodes.items():
+            print('==========NODE {}=========='.format(name))
+            input()
+            for i, rel in enumerate(node.block.relations()):
+
+                print(rel)
+                print(node.block.get_var(rel.lhs.name))
+                rel.lhs.type = node.block.get_var(rel.lhs.name).type # Assign type of lhs of expression to proper type
+                if isinstance(rel, VarAssign):
+                    print(rel.lhs.type)
+
+                    newrhs = intlib.mult_type_match(intlib.scale_type_match(rel.rhs, rel.lhs.type), rel.lhs.type)
+                    node.block._relations[i] = VarAssign(rel.lhs, newrhs)
+                    print("====Top====")
+                    print(node.block._relations[i].lhs.type)
+                    print(node.block._relations[i].rhs.type)
+                    print(node.block._relations[i].pretty_print())
+                    print(node.block._relations[i])
+                    
+                    self._change_relation_reference_datatypes(node.block._relations[i].rhs)
+                    print('entering recursion for ')
+                    print(node.block._relations[i])
+                    self._change_relation_reference_datatypes(node.block._relations[i].rhs)
+                    print(node.block._relations[i].lhs.type)
+                    print(node.block._relations[i].lhs.name)
+                    print(node.block._relations[i])
+                    print(node.block._relations[i].rhs.type)
+                    
+                    print("top^")
+
+
+                    newrhs = intlib.mult_type_match(intlib.scale_type_match(node.block._relations[i].rhs, node.block._relations[i].lhs.type), node.block._relations[i].lhs.type)
+                    node.block._relations[i] = VarAssign(node.block._relations[i].lhs, newrhs)
+                    self._relations_dict[name] = node.block._relations[i]
+
+                    print(node.block._relations[i])
+                    print(node.block._relations[i].pretty_print())
+                    print(node.block._relations[i].lhs.type)
+                    print(node.block._relations[i].rhs.type)
+                    print("bottom^")
+
+
+                    
+                elif isinstance(rel, Accumulate):
+                    print(rel.lhs.type)
+
+                    newrhs = intlib.mult_type_match(intlib.scale_type_match(rel.rhs, rel.lhs.type), rel.lhs.type)
+                    node.block._relations[i] = Accumulate(rel.lhs, newrhs)
+                    print(node.block._relations[i].pretty_print())
+                    self._change_relation_reference_datatypes(node.block._relations[i].rhs)
+                    print(node.block._relations[i].pretty_print())
+
+
+                    self._relations_dict[name] = node.block._relations[i]
+                print(rel.pretty_print())
+                print(node.block.get_var(rel.lhs.name))
             
             for p in node.block.params():
                 self._params[p.name] = p
-
         
 
 
+    def _change_relation_reference_datatypes(self, expr): #DFSdr
+        
+        print(expr)
+        assert expr.type.nbits > 0
+        if(isinstance(expr, Constant)):
+            return
+        if( hasattr(expr, "rhs") ):
+            if(isinstance(expr.lhs, Var)):
+                if(expr.lhs.type != self._vars[expr.lhs.name].type):
+                    prev_type = deepcopy(expr.type)
+                    expr.lhs.type = self._vars[expr.lhs.name].type
+                    expr.lhs = intlib.mult_type_match(intlib.scale_type_match(expr.lhs, prev_type), prev_type)
+                    print(expr.pretty_print())
+                    print(expr.lhs.type)
+                    input()
+            else:
+                self._change_relation_reference_datatypes(expr.lhs) 
+            if(isinstance(expr.rhs, Var)):
+                if(expr.rhs.type != self._vars[expr.rhs.name].type):
+                    prev_type = deepcopy(expr.type)
+                    expr.rhs.type = self._vars[expr.rhs.name].type
+                    expr.rhs = intlib.mult_type_match(intlib.scale_type_match(expr.rhs, prev_type), prev_type)
+                    print(expr.pretty_print())
+                    print(expr.rhs.type)
+                    input()
+            else:
+                self._change_relation_reference_datatypes(expr.lhs)
+          
+        else:
+            if(isinstance(expr.expr, Var)):
+                if(expr.expr.type != self._vars[expr.expr.name].type):
+                    prev_type = deepcopy(expr.type)
+                    expr.expr.type = self._vars[expr.expr.name].type
+                    expr.expr = intlib.mult_type_match(intlib.scale_type_match(expr.expr, prev_type), prev_type)
+                    print(expr.pretty_print())
+                    print(expr.expr.type)
+                    input()
+            else:
+                self._change_relation_reference_datatypes(expr.expr)
 
-            
+
+
 
 
     def _conditionTrue(self, cond):
