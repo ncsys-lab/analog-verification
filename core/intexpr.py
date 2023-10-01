@@ -73,7 +73,8 @@ class IntType(VarType):
         assert(v >= self.lower)
     
     def __post_init__(self):
-        assert self.nbits > 0
+        pass
+        #assert self.nbits > 0
 
 
 
@@ -181,7 +182,7 @@ class TruncR(IntOp):
     def type(self):
         typ = self.expr.type
         new_scale = typ.scale*(2**(self.nbits))
-        print(self.nbits)
+
         assert(self.nbits > 0)
         return IntType(nbits=typ.nbits - self.nbits, scale=new_scale, signed=typ.signed)
 

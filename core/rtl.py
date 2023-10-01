@@ -107,7 +107,7 @@ class RTLBlock:
                                     expression = self.regs[r.lhs.name](self.traverse_expr_tree(r.rhs)[0])
 
                                 fsm.add(If(self.inputs['reset'])(
-                                    self.regs[r.lhs.name](self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type))
+                                    self.regs[r.lhs.name](Int(self.scale_value_to_int(self.initconditions[r.lhs.name], r.rhs.type), r.rhs.type.nbits))
                                 ).Else(
                                     expression
                                 ),index = state_mapping[state_name])
@@ -115,7 +115,9 @@ class RTLBlock:
                                 print(self.wires[r.lhs.name])
                                 self.wires[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
                             elif r.lhs.name in self.outputs.keys():
+
                                 try:
+                                    
                                     self.outputs[r.lhs.name].assign(self.traverse_expr_tree(r.rhs)[0])
                                 except:
                                     pass
@@ -275,7 +277,7 @@ class RTLBlock:
                 wire_name = relation.op_name + "_" + str(next(self.namecounter))
                 self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
                 self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-                return (self.wires[wire_name][relation.type.nbits:]), relation.type.nbits
+                return (self.wires[wire_name][relation.nbits:]), relation.type.nbits
         elif(isinstance(relation, ToUSInt)):
             
             if(not relation.expr.type.signed):

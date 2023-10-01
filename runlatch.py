@@ -72,7 +72,7 @@ class StateMaker:
 
         vref = precharge.block.decl_var('VREF', VarKind.Input, RealType(-1, 1.7, 0.01))
         vreg = precharge.block.decl_var('VREG', VarKind.Input, RealType(-1, 3.3, 0.01))
-        o    = precharge.block.decl_var('o',  VarKind.StateVar, RealType(-1, 3.3, 0.1))  
+        o    = precharge.block.decl_var('o',  VarKind.StateVar, RealType(-1, 3.3, 0.01))  
         out  = precharge.block.decl_var('out',  VarKind.Output, o.type)
 
         precharge.block.decl_relation(VarAssign(o,Constant(3.3)))
@@ -82,8 +82,8 @@ class StateMaker:
     
     def create_evaluate_wait_high_low_state(fsm):
         evaluate_wait_high_low = Node('evaluate_wait_high_low')
-        vref = evaluate_wait_high_low.block.decl_var('VREF', VarKind.Input, RealType(-1, 3.3, 0.01))
-        vreg = evaluate_wait_high_low.block.decl_var('VREG', VarKind.Input, RealType(-1, 3.3, 0.01))
+        vref = evaluate_wait_high_low.block.decl_var('VREF', VarKind.Input, RealType(-1, 3.3, 0.001))
+        vreg = evaluate_wait_high_low.block.decl_var('VREG', VarKind.Input, RealType(-1, 3.3, 0.001))
         o    = evaluate_wait_high_low.block.decl_var('o',  VarKind.StateVar, RealType(-1, 3.3, 0.01))  
         out  = evaluate_wait_high_low.block.decl_var('out',  VarKind.Output, o.type)
 
@@ -96,7 +96,7 @@ class StateMaker:
 
         evaluate_wait_high_low.block.decl_relation(VarAssign(o,Constant(3.3)))
         evaluate_wait_high_low.block.decl_relation(VarAssign(out,o))
-        ival_reg = intervallib.compute_intervals_for_block(evaluate_wait_high_low.block,rel_prec=0.01)
+        ival_reg = intervallib.compute_intervals_for_block(evaluate_wait_high_low.block,rel_prec=0.001)
         return evaluate_wait_high_low
 
     def create_evaluate_low_high_low_state(timestep):
@@ -111,7 +111,7 @@ class StateMaker:
 
         tau_exp = StateMaker.model_params.compute_high_low_tau(evaluate_wait_high_low.block, vref, vreg)
         tau  = evaluate_wait_high_low.block.decl_var('tau', kind=VarKind.Transient,  \
-            type=intervallib.real_type_from_expr(evaluate_wait_high_low.block, tau_exp , rel_prec=0.001))
+            type=intervallib.real_type_from_expr(evaluate_wait_high_low.block, tau_exp , rel_prec=0.000001))
         #print("HEREHEREHERE")
         #print(tau.type)
         dvdt = evaluate_wait_high_low.block.decl_var("dvdt", kind=VarKind.Transient,  \
@@ -133,14 +133,14 @@ class StateMaker:
 
         wait_time_exp_lh = StateMaker.model_params.compute_low_high_response_time(evaluate_wait_low_high.block, vref, vreg)
         wait_time_lh = evaluate_wait_low_high.block.decl_var('wait_time_lh', VarKind.Transient, \
-                                                          type=intervallib.real_type_from_expr(evaluate_wait_low_high.block, wait_time_exp_lh * Constant(1 / fsm.evaluate_dt), rel_prec = 0.01))
+                                                          type=intervallib.real_type_from_expr(evaluate_wait_low_high.block, wait_time_exp_lh * Constant(1 / fsm.evaluate_dt), rel_prec = 0.001))
         
         evaluate_wait_low_high.block.decl_relation(VarAssign(wait_time_lh, wait_time_exp_lh * Constant(1 / fsm.evaluate_dt)))
         
         evaluate_wait_low_high.block.decl_relation(VarAssign(o, Constant(0.001)))
         evaluate_wait_low_high.block.decl_relation(VarAssign(out,o))
 
-        ival_reg = intervallib.compute_intervals_for_block(evaluate_wait_low_high.block, rel_prec=0.01)
+        ival_reg = intervallib.compute_intervals_for_block(evaluate_wait_low_high.block, rel_prec=0.001)
         return evaluate_wait_low_high
     
     def create_evaluate_low_low_high_state(timestep):
@@ -153,24 +153,24 @@ class StateMaker:
 
         tau_exp = StateMaker.model_params.compute_low_high_tau( evaluate_low_low_high.block, vref, vreg )
 
-        tau = evaluate_low_low_high.block.decl_var('tau_lh', VarKind.Transient, \
-                                                   type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.01))
+        tau_lh = evaluate_low_low_high.block.decl_var('tau_lh', VarKind.Transient, \
+                                                   type=intervallib.real_type_from_expr(evaluate_low_low_high.block, tau_exp, rel_prec = 0.00000001))
         
-        dodt_expr = (Constant(3.3) - o) * Reciprocal( tau )
+        dodt_expr = (Constant(3.3) - o) * Reciprocal( tau_lh )
         dodt = evaluate_low_low_high.block.decl_var('dodt', kind=VarKind.Transient, \
-                                                     type=intervallib.real_type_from_expr(evaluate_low_low_high.block,dodt_expr, rel_prec=0.01)) #Changed precision
+                                                     type=intervallib.real_type_from_expr(evaluate_low_low_high.block,dodt_expr, rel_prec=0.001)) #Changed precision
 
-        evaluate_low_low_high.block.decl_relation(VarAssign(tau, tau_exp))
+        evaluate_low_low_high.block.decl_relation(VarAssign(tau_lh, tau_exp))
         evaluate_low_low_high.block.decl_relation(VarAssign(out, o))
         evaluate_low_low_high.block.decl_relation(VarAssign(dodt, dodt_expr))
         evaluate_low_low_high.block.decl_relation(Integrate(o, dodt, timestep=timestep))
 
-        ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec=0.01)
+        ival_reg = intervallib.compute_intervals_for_block(evaluate_low_low_high.block, rel_prec=0.001)
         return evaluate_low_low_high
     
 
 
-SIM_TICKS     = 400
+SIM_TICKS     = 40000
 TICK_DIVISION = 10000
 SYSTEM_CLOCK = 1e-6
 
@@ -268,7 +268,7 @@ def validate_pymtl_model(rtlblk,timestep,clk_period):
     clk_arr = []
     cycles_per_sec = round(1/timestep)
     max_cycles = 30*cycles_per_sec
-    clk = 1
+    clk = 0
     for t in tqdm(range(SIM_TICKS)):
         
         values = rtlblk.pymtl_sim_tick({"VREG":Bits(rtlblk.block.get_var('VREG').type.nbits, v=rtlblk.scale_value_to_int(1.7,rtlblk.block.get_var('VREG').type)),
@@ -276,14 +276,16 @@ def validate_pymtl_model(rtlblk,timestep,clk_period):
                                         "sys_clk":Bits(1,v=clk)})
         print(values)
 
-        if(clk == 1 and math.fmod(t * timestep, clk_period ) > clk_period / 2):   
+        if(clk == 1 and math.fmod(t * timestep, clk_period ) < clk_period / 2):   
             clk = 0
-        elif(clk == 0 and math.fmod(t * timestep, clk_period ) < clk_period / 2):
+        elif(clk == 0 and math.fmod(t * timestep, clk_period ) > clk_period / 2):
             clk = 1
         
-        clk_arr.append(clk)
+        clk_arr.append(clk * 3.3)
         ts.append(t*timestep)
         outi = values["out"]
+        print(outi)
+
         outs.append(rtlblk.scale_value_to_real(outi, rtlblk.block.get_var('out').type))
 
     plt.plot(ts,outs, label='out')
@@ -305,18 +307,18 @@ t = np.linspace(0, SYSTEM_CLOCK * SIM_TICKS / TICK_DIVISION, SIM_TICKS)
 #plt.savefig("resp.png")
 
 
-ival_reg = intervallib.compute_intervals_for_block(evaluate_low_high_low.block, rel_prec = 0.001)
-#validate_model(evaluate_low_high_low.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
+ival_reg = intervallib.compute_intervals_for_block(precharge.block, rel_prec = 0.001)
+#validate_model(precharge.block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
 #evaluate_low_low_high.block.pretty_print_relations()
 
-fp_block = fixlib.to_fixed_point(ival_reg,evaluate_low_high_low.block)
+fp_block = fixlib.to_fixed_point(ival_reg,precharge.block)
 #validate_model(fp_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 
 fp_block.pretty_print_relations()
 
 int_block = intlib.to_integer(fp_block)
-validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
+#validate_model(int_block, SYSTEM_CLOCK/TICK_DIVISION, "low_low_high_intmodel")
 int_block.pretty_print_relations()
 int_block.pretty_print_types()
 
@@ -326,7 +328,7 @@ rtl_block = rtllib.RTLBlock(int_block,{'o':3.3})
 rtl_block.generate_verilog_src("./core/")
 rtl_block.generate_pymtl_wrapper()
 rtl_block.pymtl_sim_begin()
-validate_pymtl_model(rtl_block, SYSTEM_CLOCK/TICK_DIVISION, SYSTEM_CLOCK)
+#validate_pymtl_model(rtl_block, SYSTEM_CLOCK/TICK_DIVISION, SYSTEM_CLOCK)
 
 """
 rtl_block = rtllib.RTLBlock(int_block,{'o':0})
@@ -334,13 +336,15 @@ rtl_block = rtllib.RTLBlock(int_block,{'o':0})
 rtl_block.generate_verilog_src("./core/")
 rtl_block.generate_pymtl_wrapper()
 rtl_block.pymtl_sim_begin()
-
-comparator_latch_fsm.preprocessHierarchy()
+"""
+comparator_latch_fsm.preprocessHierarchy(rel_prec = 0.0001, override_dict = {'wait_time':IntType(nbits = 32, scale = 1.0, signed = 0)})
 rtl_fsm = rtllib.RTLBlock(comparator_latch_fsm,{'o':3.3})
 rtl_fsm.generate_verilog_src("./core/")
 rtl_fsm.generate_pymtl_wrapper()
 rtl_fsm.pymtl_sim_begin()
+print(rtl_fsm.block.get_var('out').type)
+
+
 validate_pymtl_model(rtl_fsm, SYSTEM_CLOCK/TICK_DIVISION, SYSTEM_CLOCK)
 
 
-"""

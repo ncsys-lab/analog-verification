@@ -33,9 +33,9 @@ class FixedPointType(VarType):
 
         #nvals = (max(abs(upper), abs(lower))+precision)/precision
         #Will changed this because there was a case when max(|upper|,|lower|) < precision^2 - precision
-        nvals = max(abs(upper),abs(lower)) / precision
+        nvals = (max(abs(upper),abs(lower)) / precision)
 
-        total_bits = math.ceil(math.log2(nvals))
+        total_bits = math.ceil(math.log2(nvals)) + 1
         scale_bits = math.floor(math.log2(precision))
 
         if scale_bits < 0:

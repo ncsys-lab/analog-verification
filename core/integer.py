@@ -39,7 +39,20 @@ def typecheck_int_type(node,intt,fpt):
     if not intt.matches(infer_intt):
         raise Exception("mismatch %s: int-type=%s | fp-type=%s (scale=%f) int-type=%s" \
                     % (node.op_name, intt,fpt,fpt.scale, infer_intt))
-    
+
+
+def ordered_type_match(e, t):
+    return scale_type_match( mult_type_match( sign_type_match(e, t), t), t)
+
+def sign_type_match(e,t):
+    if e.type.signed == t.signed:
+        return e
+    else:
+        if not e.type.signed:
+            return sign_type_match(ToSInt(expr = e), t)
+        else:
+            return sign_type_match(ToUSInt(expr = e), t)
+
 def mult_type_match(e,t):
     #print(e.type,t)
 
@@ -58,48 +71,30 @@ def mult_type_match(e,t):
 def scale_type_match(e, t):
     print("potential infinite loop in scale_type_match")
 
+    print("in scale_type_match")
     
-    if e.type.scale == t.scale:
+    if abs(e.type.scale - t.scale) < (min(e.type.scale,t.scale) / 2):
         print('here')
         return e
     else:
-        if(math.log2(e.type.scale) <= 0 and math.log2(t.scale) <= 0 ):
-            print(e.type)
-            print(t)
-            if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
-                nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
-                assert nbits > 0
-                return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t)
+        if( math.log2(e.type.scale) < math.log2(t.scale)):
+            nbits = round(math.log2(t.scale)) - round(math.log2(e.type.scale))
+            assert nbits > 0
+            if(nbits > 0):
+                return scale_type_match(TruncR(nbits=nbits, expr = e), t)
             else:
-                nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
-                assert nbits > 0
-                return scale_type_match(TruncR(nbits = nbits, expr = e), t )
-        elif(math.log2(e.type.scale) > 0 and math.log2(t.scale) > 0 ):
-            print(e.type)
-            print(t)
-            if( abs(math.log2(e.type.scale)) < abs(math.log2(t.scale)) ):
-                nbits = round(abs(math.log2(t.scale))) - round(abs(math.log2(e.type.scale)))
-                assert nbits > 0
-                return scale_type_match(TruncR(nbits = nbits, expr = e), t)
-            else:
-                nbits = round(abs(math.log2(e.type.scale))) - round(abs(math.log2(t.scale)))
-                assert nbits > 0
-                return scale_type_match(PadR(nbits = nbits, expr = e, value = 0), t )
+                return scale_type_match(PadR(nbits=-nbits, expr = e, value = 0), t)
         else:
-            if( math.log2(e.type.scale) < math.log2(t.scale)):
-                nbits = round(math.log2(t.scale)) - round(math.log2(e.type.scale))
-                assert nbits > 0
-                if(nbits > 0):
-                    return scale_type_match(TruncR(nbits=nbits, expr = e), t)
-                else:
-                    return scale_type_match(PadR(nbits=-nbits, expr = e, value = 0), t)
+            nbits = round(math.log2(e.type.scale)) - round(math.log2(t.scale))
+            assert nbits > 0
+            print(e.type)
+            print(t)
+            print(nbits)
+            input()
+            if(nbits > 0):
+                return scale_type_match(PadR(nbits=nbits, expr = e, value = 0), t)
             else:
-                nbits = round(math.log2(e.type.scale)) - round(math.log2(t.scale))
-                assert nbits > 0
-                if(nbits > 0):
-                    return scale_type_match(PadR(nbits=nbits, expr = e, value = 0), t)
-                else:
-                    return scale_type_match(TruncR(nbits=-nbits, expr = e), t)
+                return scale_type_match(TruncR(nbits=-nbits, expr = e), t)
 
 
 

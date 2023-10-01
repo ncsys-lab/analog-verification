@@ -130,13 +130,9 @@ def execute_block(blk, args):
 
 
         if(rel.lhs.name == 'o'):
-            obj = rel.rhs
-            
-            # print("{} + {}".format(vals[rel.lhs.name], rel.rhs.type.to_real(rel.rhs.execute(vals))))
-            # print(obj.type.to_real(obj.execute(vals)))
-            # print(obj.type)
-            # print(obj.expr.type)
-            # print(obj.pretty_print())
+            print(rel.lhs.type)
+            print(rel.rhs.type)
+
 
 
         if isinstance(rel, VarAssign):

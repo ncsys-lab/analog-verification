@@ -92,7 +92,7 @@ def propagate_expr(reg, e,rel_prec):
     if isinstance(e, exprlib.Constant) or isinstance(e, exprlib.Param):
         lb = e.value - (abs(e.value)*rel_prec)
         ub = e.value + (abs(e.value)*rel_prec)
-        info = reg.decl_info(e.ident, lb, ub, abs(e.value)*rel_prec)
+        info = reg.decl_info(e.ident, lb, ub, abs(ub - lb)*rel_prec)
         e.type = exprlib.RealType(lower=info.lower, upper=info.upper, prec=info.precision)
     else:
         expr = e.sympy
