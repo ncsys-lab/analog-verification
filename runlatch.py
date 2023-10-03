@@ -188,7 +188,7 @@ evaluate_low_low_high = StateMaker.create_evaluate_low_low_high_state(comparator
 
 
 #[precharge] -posedge clk-> [evaluate_wait] [evaluate_low] []
-precharge_to_eval_w_hl = Edge(precharge, evaluate_wait_high_low, ClockCondition(ClockCondition.Transition.POSEDGE, AnalogSignalCondition( 'VREF', (comparator_latch_fsm.state_vars['VREG'],float('inf')) ) ) ) 
+precharge_to_eval_w_hl = Edge(precharge, evaluate_wait_high_low, ClockCondition(ClockCondition.Transition.POSEDGE, AnalogSignalCondition( 'VREF', (precharge.block.get_var('VREG'),float('inf')) ) ) ) 
 #[precharge] -posedge clk-> [evaluate_wait] -duration-> [evaluate_low] []
 evaluate_wait_hl_to_evaluate_lhl = Edge(evaluate_wait_high_low, evaluate_low_high_low, AnalogTimeCondition(evaluate_wait_high_low.block.get_var('wait_time')))#need to convert this to int and not frac
 #[precharge] -posedge clk-> [evaluate_wait] -duration-> [evaluate_low] -negedge clk-> [evalate_wait]
@@ -205,7 +205,7 @@ comparator_latch_fsm.addNode(evaluate_wait_low_high)
 comparator_latch_fsm.addNode(evaluate_low_low_high)
 
 print(comparator_latch_fsm.edges)
-input()
+
 comparator_latch_fsm.addEdge(precharge_to_eval_w_hl)
 comparator_latch_fsm.addEdge(evaluate_wait_hl_to_evaluate_lhl)
 comparator_latch_fsm.addEdge(evaluate_lhl_to_wait_llh)
@@ -213,7 +213,7 @@ comparator_latch_fsm.addEdge(evaluate_wait_llh_to_evaluate_llh)
 comparator_latch_fsm.addEdge(evaluate_llh_to_precharge)
 
 print(comparator_latch_fsm.edges)
-input()
+
 
 comparator_latch_fsm.starting_state = precharge
 comparator_latch_fsm.reset()
@@ -271,7 +271,7 @@ def validate_pymtl_model(rtlblk,timestep,clk_period):
     clk = 0
     for t in tqdm(range(SIM_TICKS)):
         
-        values = rtlblk.pymtl_sim_tick({"VREG":Bits(rtlblk.block.get_var('VREG').type.nbits, v=rtlblk.scale_value_to_int(1.7,rtlblk.block.get_var('VREG').type)),
+        values = rtlblk.pymtl_sim_tick({"VREG":Bits(rtlblk.block.get_var('VREG').type.nbits, v=rtlblk.scale_value_to_int(2.2,rtlblk.block.get_var('VREG').type)),
                                         "VREF":Bits(rtlblk.block.get_var('VREF').type.nbits, v=rtlblk.scale_value_to_int(2,rtlblk.block.get_var('VREF').type)),
                                         "sys_clk":Bits(1,v=clk)})
         print(values)
@@ -337,7 +337,7 @@ rtl_block.generate_verilog_src("./core/")
 rtl_block.generate_pymtl_wrapper()
 rtl_block.pymtl_sim_begin()
 """
-comparator_latch_fsm.preprocessHierarchy(rel_prec = 0.0001, override_dict = {'wait_time':IntType(nbits = 32, scale = 1.0, signed = 0)})
+comparator_latch_fsm.preprocessHierarchy(rel_prec = 0.0001, override_dict = {'wait_time':IntType(nbits = 32, scale = 1.0, signed = 0), 'wait_time_lh':IntType(nbits = 32, scale = 1.0, signed = 0)})
 rtl_fsm = rtllib.RTLBlock(comparator_latch_fsm,{'o':3.3})
 rtl_fsm.generate_verilog_src("./core/")
 rtl_fsm.generate_pymtl_wrapper()

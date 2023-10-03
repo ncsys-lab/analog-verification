@@ -18,7 +18,7 @@ class FSMAMSBlock:
         self.system_dt   = system_dt
         self.evaluate_dt = system_dt / evaluate_dt_division
         print(self.evaluate_dt)
-        input()
+
         self.evaluate_dt_division = evaluate_dt_division #must be even for posedge and negedge
 
         self.evaluate_cycles = 0
@@ -129,7 +129,7 @@ class FSMAMSBlock:
 
                             print('NEW RANGE for {}'.format(v.name))
                             print(2 ** self._vars[v.name].type.nbits * self._vars[v.name].type.scale)
-                            input()
+
 
                         if(stored_var.type.nbits < v.type.nbits ):
                             self._vars[v.name] = VarInfo(name=v.name, kind=v.kind, type = intlib.IntType(nbits = v.type.nbits, scale = stored_var.type.scale, signed = stored_var.type.signed or v.type.signed))
@@ -152,10 +152,10 @@ class FSMAMSBlock:
         
         print("BLOCK_VAR")
         print(self._vars['o'])
-        input()
+
         for name, node in self.nodes.items():
             print('==========NODE {}=========='.format(name))
-            input()
+
             for i, rel in enumerate(node.block.relations()):
                 
                 print(rel)
@@ -202,12 +202,15 @@ class FSMAMSBlock:
                     newrhs = intlib.mult_type_match(intlib.scale_type_match(intlib.sign_type_match(node.block._relations[i].rhs, node.block._relations[i].lhs.type), node.block._relations[i].lhs.type), node.block._relations[i].lhs.type)
                     node.block._relations[i] = VarAssign(node.block._relations[i].lhs, newrhs)
                     self._relations_dict[name] = node.block._relations[i]
-
+                    
+                    
                     print(node.block._relations[i])
                     print(node.block._relations[i].pretty_print())
                     print(node.block._relations[i].lhs.type)
                     print(node.block._relations[i].rhs.type)
+
                     print("bottom^")
+
                     """
                     if(rel.lhs.name == 'o' and name == 'precharge'):
                     print('OUT')
@@ -238,7 +241,7 @@ class FSMAMSBlock:
 
     def _change_relation_reference_datatypes(self, expr): #DFSdr
         
-        print(expr)
+        
         
         assert expr.type.nbits > 0
         if(isinstance(expr, Constant)):
@@ -246,50 +249,58 @@ class FSMAMSBlock:
         if( hasattr(expr, "rhs") ):
             if(isinstance(expr.lhs, Var)):
                 if(expr.lhs.type != self._vars[expr.lhs.name].type):
-                    prev_type = deepcopy(expr.type)
+                    prev_type = deepcopy(expr.lhs.type)
                     print()
                     expr.lhs.type = deepcopy(self._vars[expr.rhs.name].type)
                     print(expr.pretty_print())
                     print(expr.type)
                     print(expr.lhs.type)
-                    input()
+
                     expr.lhs = intlib.mult_type_match(intlib.scale_type_match(intlib.sign_type_match(expr.lhs, prev_type), prev_type), prev_type)
                     print(expr.pretty_print())
                     print(expr.type)
                     print(expr.lhs.type)
-                    input()
+
             else:
                 self._change_relation_reference_datatypes(expr.lhs) 
             if(isinstance(expr.rhs, Var)):
                 if(expr.rhs.type != self._vars[expr.rhs.name].type):
-                    prev_type = deepcopy(expr.type)
+                    prev_type = deepcopy(expr.rhs.type)
                     expr.rhs.type = deepcopy(self._vars[expr.rhs.name].type)
                     print(expr.pretty_print())
                     print(expr.type)
                     print(expr.rhs.type)
-                    input()
+
                     expr.rhs = intlib.mult_type_match(intlib.scale_type_match(intlib.sign_type_match(expr.rhs, prev_type), prev_type), prev_type)
                     print(expr.pretty_print())
                     print(expr.type)
                     print(expr.rhs.type)
-                    input()
+
             else:
                 self._change_relation_reference_datatypes(expr.lhs)
           
         else:
             if(isinstance(expr.expr, Var)):
                 if(expr.expr.type != self._vars[expr.expr.name].type):
-                    prev_type = deepcopy(expr.type)
-                    expr.expr.type = deepcopy(self._vars[expr.expr.name].type)
+                    crash = False
+                    if(expr.expr.name == "VREF"):
+                        crash = True
+                        print('i will crash')
                     print(expr.pretty_print())
                     print(expr.type)
                     print(expr.expr.type)
-                    input()
+                    prev_type = deepcopy(expr.expr.type)
+                    expr.expr.type = deepcopy(self._vars[expr.expr.name].type)
+                    print(expr.pretty_print())
+                    print(self._vars[expr.expr.name].type)
+                      
+
                     expr.expr = intlib.mult_type_match(intlib.scale_type_match(intlib.sign_type_match(expr.expr, prev_type), prev_type), prev_type)
                     print(expr.pretty_print())
                     print(expr.type)
                     print(expr.expr.type)
-                    input()                    
+
+                  
             else:
                 self._change_relation_reference_datatypes(expr.expr)
 

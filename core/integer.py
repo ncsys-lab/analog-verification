@@ -90,7 +90,7 @@ def scale_type_match(e, t):
             print(e.type)
             print(t)
             print(nbits)
-            input()
+
             if(nbits > 0):
                 return scale_type_match(PadR(nbits=nbits, expr = e, value = 0), t)
             else:
@@ -186,7 +186,7 @@ def fpexpr_to_intexpr(blk,expr):
         neg.type = IntType.from_fixed_point_type(expr.type)
         print(neg.type)
         print(expr)
-        input()
+
         
 
         return neg

@@ -230,7 +230,7 @@ def fixed_point_expr(reg,expr):
         neg_expr.type = targ_type
         print(expr)
         print(neg_expr.type)
-        input()
+
 
         return neg_expr
 
@@ -276,7 +276,7 @@ def fixed_point_block(reg,block):
     for v in block.vars():
         print(v.name)
         print(v.type)
-        input()
+
         typ = fixed_point_var(reg,v)
         fp_block.decl_var(name=v.name, type=typ, kind=v.kind)
 

@@ -155,9 +155,14 @@ class RTLBlock:
                 var = self.inputs[condition.expr]
 
             print(self.block._vars[condition.expr].type.nbits)
-
-            lb = Int(self.scale_value_to_int(condition.range[0], self.block._vars[condition.expr].type), width=self.block._vars[condition.expr].type.nbits)
-            ub = Int(self.scale_value_to_int(condition.range[1], self.block._vars[condition.expr].type), width=self.block._vars[condition.expr].type.nbits)
+            if( isinstance(condition.range[0], float) ):
+                lb = Int(self.scale_value_to_int(condition.range[0], self.block._vars[condition.expr].type), width=self.block._vars[condition.expr].type.nbits)
+            else:
+                lb = self.inputs[condition.range[0].name]
+            if( isinstance(condition.range[1], float)):
+                ub = Int(self.scale_value_to_int(condition.range[1], self.block._vars[condition.expr].type), width=self.block._vars[condition.expr].type.nbits)
+            else:
+                ub = self.inputs[condition.range[1].name]
             return And((var > lb),(var <= ub))
                 
         else:
@@ -305,12 +310,26 @@ class RTLBlock:
                 return self.wires[imm_wire_debug_name], relation.type.nbits
 
         elif(isinstance(relation, TruncVal)):
-            wire_name = relation.op_name + "_" + str(next(self.namecounter))
-            self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
-            self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
-            return (self.wires[wire_name][:relation.expr.type.nbits - relation.nbits]), relation.type.nbits
+            if(relation.expr.type.signed):
+                wire_name = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
+                self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
+                
+                wire_name_imm = relation.op_name + "_imm_" + str(next(self.namecounter))
+                self.wires[wire_name_imm] = self.m.Wire(wire_name_imm, relation.type.nbits)
+                self.wires[wire_name_imm].assign(Cat(self.wires[wire_name][-1], self.wires[wire_name][:relation.expr.type.nbits - relation.nbits - 1] ))
+                
+                return (self.wires[wire_name_imm]), relation.type.nbits
+            else:
+                wire_name = relation.op_name + "_" + str(next(self.namecounter))
+                self.wires[wire_name] = self.m.Wire(wire_name, relation.expr.type.nbits)
+                self.wires[wire_name].assign(self.traverse_expr_tree(relation.expr)[0])
+                return (self.wires[wire_name][:relation.expr.type.nbits - relation.nbits]), relation.type.nbits
         elif(isinstance(relation, PadR)):
-            
+            print(relation.pretty_print())
+            print(relation.type)
+            print(relation.expr.type)
+            input()
             padr_wire_name = relation.op_name + "_" + str(next(self.namecounter))
             self.wires[padr_wire_name] = self.m.Wire(padr_wire_name, relation.type.nbits)
 
